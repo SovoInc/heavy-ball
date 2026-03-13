@@ -5,6 +5,7 @@ import type { Ball } from "./objects/Ball";
 export class Controls {
   private keys = new Set<string>();
   private enabled = true;
+  speedMultiplier = 1;
 
   constructor() {
     window.addEventListener("keydown", this.onKeyDown);
@@ -18,6 +19,7 @@ export class Controls {
   ]);
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if ((e.target as HTMLElement)?.tagName === "INPUT") return;
     if (this.gameKeys.has(e.code)) {
       e.preventDefault();
     }
@@ -61,10 +63,11 @@ export class Controls {
 
     if (force.length() > 0) {
       const speed = ball.speed;
-      const speedRatio = Math.max(0, 1 - speed / CONFIG.ball.maxSpeed);
-      force.scale(speedRatio, force);
+      const maxSpeed = CONFIG.ball.maxSpeed * this.speedMultiplier;
+      const speedRatio = Math.max(0, 1 - speed / maxSpeed);
+      force.scale(speedRatio * this.speedMultiplier, force);
       ball.body.wakeUp();
-      ball.body.applyForce(force, ball.body.position);
+      ball.body.applyForce(force);
     }
   }
 

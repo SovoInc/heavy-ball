@@ -6,8 +6,12 @@ import { Physics } from "../physics";
 export class Ball {
   mesh: THREE.Mesh;
   body: CANNON.Body;
+  private physics: Physics;
+  private currentScale = 1;
+  private visualQuat = new THREE.Quaternion();
 
   constructor(scene: THREE.Scene, physics: Physics) {
+    this.physics = physics;
     const { radius, mass, linearDamping, angularDamping } = CONFIG.ball;
 
     const geo = new THREE.SphereGeometry(radius, 64, 64);
@@ -38,14 +42,25 @@ export class Ball {
     this.body.velocity.setZero();
     this.body.angularVelocity.setZero();
     this.body.quaternion.setFromEuler(0, 0, 0);
+    this.visualQuat.identity();
     this.syncMesh();
   }
 
-  syncMesh() {
+  syncMesh(dt = 1 / 60) {
     this.mesh.position.copy(this.body.position as unknown as THREE.Vector3);
-    this.mesh.quaternion.copy(
-      this.body.quaternion as unknown as THREE.Quaternion,
-    );
+
+    // Derive visual rotation from linear velocity (decoupled from physics spin)
+    const vel = this.body.velocity;
+    const groundSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+    if (groundSpeed > 0.1) {
+      const r = CONFIG.ball.radius * this.currentScale;
+      const angle = (groundSpeed / r) * dt;
+      // Rolling axis is perpendicular to velocity in the ground plane
+      const axis = new THREE.Vector3(vel.z / groundSpeed, 0, -vel.x / groundSpeed);
+      const delta = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+      this.visualQuat.premultiply(delta);
+    }
+    this.mesh.quaternion.copy(this.visualQuat);
   }
 
   get position(): CANNON.Vec3 {
@@ -54,6 +69,20 @@ export class Ball {
 
   get speed(): number {
     return this.body.velocity.length();
+  }
+
+  setScale(factor: number) {
+    if (factor === this.currentScale) return;
+    this.currentScale = factor;
+    const r = CONFIG.ball.radius * factor;
+    this.mesh.scale.setScalar(factor);
+    // Replace physics shape
+    while (this.body.shapes.length) this.body.removeShape(this.body.shapes[0]);
+    this.body.addShape(new CANNON.Sphere(r));
+  }
+
+  resetScale() {
+    this.setScale(1);
   }
 
   /**
