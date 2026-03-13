@@ -1,0 +1,7 @@
+pub const FIRST_FINISH: &str = "first_finish";
+pub const SPEED_DEMON: &str = "speed_demon";
+pub const BOX_SMASHER: &str = "box_smasher";
+pub const POWER_COLLECTOR: &str = "power_collector";
+pub const COMPLETIONIST: &str = "completionist";
+pub const NO_FALL: &str = "no_fall";
+pub const SPEEDSTER: &str = "speedster";
