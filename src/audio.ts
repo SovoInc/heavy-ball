@@ -117,6 +117,65 @@ export function playLevelComplete() {
   });
 }
 
+/** Short ascending chime — power-up collected */
+export function playPowerUp() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const notes = [880, 1109, 1319]; // A5 C#6 E6
+
+  notes.forEach((freq, i) => {
+    const t = now + i * 0.08;
+    const osc = ac.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  });
+}
+
+/** Short sizzle — ball on lava */
+export function playLavaHiss() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+
+  const noise = ac.createBufferSource();
+  noise.buffer = makeNoise(ac, 0.5);
+  const hp = ac.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 3000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.15, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+  noise.connect(hp).connect(g).connect(ac.destination);
+  noise.start(now);
+  noise.stop(now + 0.5);
+}
+
+/** Low rumble — floor crumbles */
+export function playCrumble() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+
+  const noise = ac.createBufferSource();
+  noise.buffer = makeNoise(ac, 0.8);
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(400, now);
+  bp.frequency.exponentialRampToValueAtTime(80, now + 0.7);
+  bp.Q.value = 1;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.2, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+  noise.connect(bp).connect(g).connect(ac.destination);
+  noise.start(now);
+  noise.stop(now + 0.8);
+}
+
 /** Soft filtered noise — continuous while ball moves */
 let rollNoise: AudioBufferSourceNode | null = null;
 let rollGain: GainNode | null = null;
