@@ -76,7 +76,7 @@ export class Ball {
     // covers (2π/size)*cos(θ) surface distance, one vertical pixel covers π/size.
     // To get equal angular size: sqW = sqH * (π/size) / ((2π/size)*cos(θ)) = sqH / (2*cos(θ))
     c.fillStyle = "rgba(255, 255, 255, 0.7)";
-    const sqH = 28;
+    const sqH = 56;
     const cx = size * 0.25;
     const cy = size * 0.42;
     const spacing = sqH * 2; // gap = sqH between squares
