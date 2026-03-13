@@ -6,6 +6,8 @@ export class Physics {
   groundMaterial: CANNON.Material;
   ballMaterial: CANNON.Material;
   wallMaterial: CANNON.Material;
+  iceMaterial: CANNON.Material;
+  bounceMaterial: CANNON.Material;
 
   constructor() {
     this.world = new CANNON.World({
@@ -18,6 +20,8 @@ export class Physics {
     this.groundMaterial = new CANNON.Material("ground");
     this.ballMaterial = new CANNON.Material("ball");
     this.wallMaterial = new CANNON.Material("wall");
+    this.iceMaterial = new CANNON.Material("ice");
+    this.bounceMaterial = new CANNON.Material("bounce");
 
     this.world.addContactMaterial(
       new CANNON.ContactMaterial(this.ballMaterial, this.groundMaterial, {
@@ -30,6 +34,20 @@ export class Physics {
       new CANNON.ContactMaterial(this.ballMaterial, this.wallMaterial, {
         friction: CONFIG.physics.wallFriction,
         restitution: CONFIG.physics.wallRestitution,
+      }),
+    );
+
+    this.world.addContactMaterial(
+      new CANNON.ContactMaterial(this.ballMaterial, this.iceMaterial, {
+        friction: CONFIG.physics.iceFriction,
+        restitution: CONFIG.physics.iceRestitution,
+      }),
+    );
+
+    this.world.addContactMaterial(
+      new CANNON.ContactMaterial(this.ballMaterial, this.bounceMaterial, {
+        friction: CONFIG.physics.bounceFriction,
+        restitution: CONFIG.physics.bounceRestitution,
       }),
     );
   }
