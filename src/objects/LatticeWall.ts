@@ -46,7 +46,7 @@ export class LatticeWall {
         barThickness,
         barMat,
         offset,
-        py + height / 2,
+        height / 2,
       );
 
       const collisionDepth = 1;
