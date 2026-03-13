@@ -1,0 +1,56 @@
+export const CONFIG = {
+  ball: {
+    radius: 0.5,
+    mass: 8,
+    linearDamping: 0.5,
+    angularDamping: 0.6,
+    moveForce: 30,
+    maxSpeed: 14,
+  },
+  physics: {
+    gravity: -20,
+    fixedTimeStep: 1 / 60,
+    maxSubSteps: 10,
+    groundFriction: 0.7,
+    groundRestitution: 0.05,
+    wallFriction: 0.8,
+    wallRestitution: 0.05,
+  },
+  camera: {
+    offset: { x: 0, y: 8, z: 12 },
+    lookAheadDistance: 3,
+    lerpSpeed: 0.06,
+  },
+  path: {
+    wideWidth: 6,
+    narrowWidth: 2.2,
+    wallHeight: 1.5,
+    wallThickness: 0.3,
+    bridgeRailHeight: 0.3,
+  },
+  world: {
+    fallThreshold: -10,
+    respawnHeight: 3,
+  },
+  colors: {
+    ball: 0x8899aa,
+    path: 0x556677,
+    pathEdge: 0x445566,
+    bridge: 0x997755,
+    latticeWall: 0x99aabb,
+    finishZone: 0x44cc88,
+    startZone: 0x4488cc,
+    sky: {
+      top: 0x1a1a2e,
+      bottom: 0x3a3a5e,
+    },
+  },
+  breakable: {
+    speedThreshold: 5,
+    debrisCount: 10,
+    debrisLifetime: 1.2,
+    debrisSpeed: 6,
+    debrisGravity: -15,
+    debrisSize: 0.15,
+  },
+} as const;
