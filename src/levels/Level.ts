@@ -291,6 +291,10 @@ export class Level {
         this.bodyToObstacle.set(o.body, o);
       }
     }
+    // Restore crumbled path segments
+    for (const seg of this.pathSegments) {
+      seg.restore();
+    }
     // Clear lava timers on reset
     this.lavaTimers.clear();
     this.lavaHissPlayed.clear();

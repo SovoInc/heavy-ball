@@ -36,6 +36,7 @@ export class PathSegment {
   private scene: THREE.Scene;
   private animTime = 0;
   private material: THREE.MeshStandardMaterial;
+  private originalPosition: THREE.Vector3;
 
   constructor(
     scene: THREE.Scene,
@@ -111,6 +112,7 @@ export class PathSegment {
     if (def.rotation) {
       this.mesh.rotation.y = def.rotation;
     }
+    this.originalPosition = this.mesh.position.clone();
     scene.add(this.mesh);
 
     // Determine physics material
@@ -196,6 +198,23 @@ export class PathSegment {
   startCrumble() {
     if (this.surfaceType === SurfaceType.Crumbling && this.crumbleTimer < 0) {
       this.crumbleTimer = CONFIG.surfaces.crumbling.delay;
+    }
+  }
+
+  restore() {
+    if (!this.crumbled && this.crumbleTimer < 0) return;
+
+    this.crumbled = false;
+    this.crumbleTimer = -1;
+    this.mesh.visible = true;
+    this.material.opacity = 1;
+    this.material.transparent = false;
+    this.mesh.position.copy(this.originalPosition);
+
+    this.physics.addBody(this.body);
+    for (const w of this.walls) {
+      w.mesh.visible = true;
+      this.physics.addBody(w.body);
     }
   }
 
