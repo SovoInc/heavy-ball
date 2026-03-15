@@ -29,8 +29,8 @@ export const LEVEL_17: LevelData = {
     // Speed strip 2: faster launch (z -36 to -44)
     { position: [0, 0, -40], size: [W, H, 8], noWalls: true, surfaceType: SurfaceType.Speed, direction: [0, 0, -1] },
 
-    // Elevated bounce pads at y=2 (z -44 to -56)
-    { position: [0, 2, -50], size: [W, H, 12], noWalls: true, surfaceType: SurfaceType.Bounce },
+    // Bounce pads at ground level (z -44 to -56)
+    { position: [0, 0, -50], size: [W, H, 12], noWalls: true, surfaceType: SurfaceType.Bounce },
 
     // Drop down to normal platform (z -56 to -62)
     { position: [0, 0, -59], size: [W, H, 6], noWalls: true },
@@ -41,8 +41,8 @@ export const LEVEL_17: LevelData = {
     // Speed strip 3 heading south (z -65 to -75)
     { position: [6, 0, -70], size: [W, H, 10], noWalls: true, surfaceType: SurfaceType.Speed, direction: [0, 0, -1] },
 
-    // Elevated bounce pads at y=3 (z -75 to -88)
-    { position: [6, 3, -81.5], size: [W, H, 13], noWalls: true, surfaceType: SurfaceType.Bounce },
+    // Bounce pads at ground level (z -75 to -88)
+    { position: [6, 0, -81.5], size: [W, H, 13], noWalls: true, surfaceType: SurfaceType.Bounce },
 
     // Landing platform after big bounce (z -88 to -94)
     { position: [6, 0, -91], size: [W, H, 6], noWalls: true },
