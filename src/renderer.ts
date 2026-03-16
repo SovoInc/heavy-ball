@@ -21,7 +21,7 @@ export class Renderer {
     );
     this.camera.position.set(0, 10, 15);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, logarithmicDepthBuffer: true });
     const dpr = Math.min(window.devicePixelRatio, 2);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
