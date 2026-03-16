@@ -134,9 +134,25 @@ function findReachable(startIndices: number[], segments: PathSegmentDef[]): Set<
 
   while (queue.length > 0) {
     const current = queue.shift()!;
+    const seg = segments[current];
+
+    // Teleport: if this segment has a teleportTarget, any segment overlapping the target is reachable
+    if (seg.surfaceType === SurfaceType.Teleport && seg.teleportTarget) {
+      const [tx, , tz] = seg.teleportTarget;
+      for (let j = 0; j < segments.length; j++) {
+        if (visited.has(j)) continue;
+        const bb = segmentAABB(segments[j]);
+        if (tx >= bb.minX - BALL_RADIUS && tx <= bb.maxX + BALL_RADIUS &&
+            tz >= bb.minZ - BALL_RADIUS && tz <= bb.maxZ + BALL_RADIUS) {
+          visited.add(j);
+          queue.push(j);
+        }
+      }
+    }
+
     for (let j = 0; j < segments.length; j++) {
       if (visited.has(j)) continue;
-      if (canReach(segments[current], segments[j])) {
+      if (canReach(seg, segments[j])) {
         visited.add(j);
         queue.push(j);
       }
@@ -298,6 +314,108 @@ describe("Level playability", () => {
         }
 
         expect(failures, `Speed platform gaps:\n${failures.join("\n")}`).toHaveLength(0);
+      });
+
+      it("moving platforms touch a neighbor at each extreme", () => {
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.paths.length; j++) {
+          const seg = level.paths[j];
+          if (!seg.platformMoving) continue;
+
+          const { axis, range } = seg.platformMoving;
+          const [px, py, pz] = seg.position;
+          const [, sh] = seg.size;
+
+          const movesY = Math.abs(axis[1]) > 0.1;
+
+          // Check both extremes (+range and -range)
+          // For Y-axis movers, only check that at least one extreme touches a neighbor
+          // (ball boards at one height and rides to another)
+          let anyExtremeConnects = false;
+          const extremeFailures: string[] = [];
+
+          for (const sign of [1, -1]) {
+            const extremePos: [number, number, number] = [
+              px + axis[0] * range * sign,
+              py + axis[1] * range * sign,
+              pz + axis[2] * range * sign,
+            ];
+            const extremeBox = segmentAABB({ position: extremePos, size: seg.size });
+
+            let minGap = Infinity;
+            for (let k = 0; k < level.paths.length; k++) {
+              if (k === j) continue;
+              const otherSeg = level.paths[k];
+              const otherBox = segmentAABB(otherSeg);
+              const gap = horizontalGap(extremeBox, otherBox);
+              const extremeTop = extremePos[1] + sh / 2;
+              const otherTop = topY(otherSeg);
+              if (Math.abs(extremeTop - otherTop) <= BALL_RADIUS + 0.5) {
+                minGap = Math.min(minGap, gap);
+              }
+            }
+            if (minGap <= BALL_RADIUS) {
+              anyExtremeConnects = true;
+            } else {
+              const dir = sign > 0 ? "+" : "-";
+              extremeFailures.push(
+                `Segment ${j} [moving] at ${dir}extreme ` +
+                `(${extremePos.map(v => v.toFixed(1)).join(",")}) ` +
+                `has ${minGap === Infinity ? "no" : minGap.toFixed(1) + " unit"} gap to nearest neighbor`
+              );
+            }
+          }
+
+          if (movesY) {
+            // Y-axis movers: check that the platform at its rest position
+            // touches a neighbor horizontally (ball boards when platform is level)
+            const restBox = segmentAABB(seg);
+            let restConnects = false;
+            for (let k = 0; k < level.paths.length; k++) {
+              if (k === j) continue;
+              const otherBox = segmentAABB(level.paths[k]);
+              if (horizontalGap(restBox, otherBox) <= BALL_RADIUS &&
+                  Math.abs(topY(seg) - topY(level.paths[k])) <= BALL_RADIUS + 0.5) {
+                restConnects = true;
+                break;
+              }
+            }
+            if (!restConnects) {
+              failures.push(
+                `Segment ${j} [moving Y-axis] at rest position doesn't touch any neighbor`
+              );
+            }
+          } else {
+            // Non-Y movers need both extremes to connect
+            failures.push(...extremeFailures);
+          }
+        }
+
+        expect(failures, `Moving platform gaps:\n${failures.join("\n")}`).toHaveLength(0);
+      });
+
+      it("moving platforms on Z-axis have a pause for boarding", () => {
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.paths.length; j++) {
+          const seg = level.paths[j];
+          if (!seg.platformMoving) continue;
+
+          const { axis, pause } = seg.platformMoving;
+          // If the platform moves along Z (forward/back), it needs a pause
+          // so the ball can board and exit
+          if (Math.abs(axis[2]) > 0.1) {
+            if (!pause || pause < 0.5) {
+              failures.push(
+                `Segment ${j} [moving Z-axis] has pause=${pause ?? 0}s, ` +
+                `needs at least 0.5s for ball to board`
+              );
+            }
+          }
+        }
+
+        expect(failures, `Missing pause:\n${failures.join("\n")}`).toHaveLength(0);
       });
 
       it("finish zone is reachable from start", () => {

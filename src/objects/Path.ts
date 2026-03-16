@@ -10,6 +10,10 @@ export enum SurfaceType {
   Bounce = "bounce",
   Speed = "speed",
   Crumbling = "crumbling",
+  Teleport = "teleport",
+  Shrinking = "shrinking",
+  Magnet = "magnet",
+  Invisible = "invisible",
 }
 
 export interface PathSegmentDef {
@@ -20,6 +24,11 @@ export interface PathSegmentDef {
   noWalls?: boolean;
   surfaceType?: SurfaceType;
   direction?: [number, number, number]; // for Speed surfaces
+  tilt?: number; // pitch angle in radians
+  platformMoving?: { axis: [number, number, number]; range: number; speed: number; pause?: number };
+  platformRotating?: { speed: number }; // Y-axis rotation speed (rad/s)
+  teleportTarget?: [number, number, number];
+  invisible?: { onTime: number; offTime: number };
 }
 
 function createArrowTexture(): THREE.CanvasTexture {
@@ -64,8 +73,21 @@ export class PathSegment {
   surfaceType: SurfaceType;
   size: [number, number, number];
   speedDirection: THREE.Vector3 | null = null;
+  teleportTarget: THREE.Vector3 | null = null;
   crumbleTimer = -1;
   crumbled = false;
+  shrinkScale = 1;
+  shrinkActive = false;
+  invisibleActive = true;
+
+  private respawnTimer = -1;
+  private shrinkRestoreTimer = -1;
+  private invisibleTimer = 0;
+  private invisibleOnTime = 2;
+  private invisibleOffTime = 2;
+  private movingDef: PathSegmentDef["platformMoving"] | null = null;
+  private rotatingDef: PathSegmentDef["platformRotating"] | null = null;
+  private originalRotationY = 0;
 
   private physics: Physics;
   private scene: THREE.Scene;
@@ -78,6 +100,8 @@ export class PathSegment {
   private fireData: { y: number; phase: number; speed: number; baseX: number; baseZ: number }[] = [];
   private frostParticles: THREE.Points | null = null;
   private frostData: { phase: number; baseX: number; baseY: number; baseZ: number }[] = [];
+  private magnetParticles: THREE.Points | null = null;
+  private magnetData: { angle: number; r: number; speed: number }[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -125,6 +149,28 @@ export class PathSegment {
         emissive = CONFIG.surfaces.crumbling.emissive;
         emissiveIntensity = 0;
         break;
+      case SurfaceType.Teleport:
+        color = CONFIG.surfaces.teleport.color;
+        emissive = CONFIG.surfaces.teleport.emissive;
+        emissiveIntensity = 0.6;
+        break;
+      case SurfaceType.Shrinking:
+        color = CONFIG.surfaces.shrinking.color;
+        emissive = CONFIG.surfaces.shrinking.emissive;
+        emissiveIntensity = 0.4;
+        break;
+      case SurfaceType.Magnet:
+        color = CONFIG.surfaces.magnet.color;
+        emissive = CONFIG.surfaces.magnet.emissive;
+        emissiveIntensity = 0.8;
+        break;
+      case SurfaceType.Invisible:
+        color = CONFIG.surfaces.invisible.color;
+        emissive = CONFIG.surfaces.invisible.emissive;
+        emissiveIntensity = 0.3;
+        transparent = true;
+        opacity = 0.6;
+        break;
       default:
         color = isBridge ? CONFIG.colors.bridge : CONFIG.colors.path;
         break;
@@ -132,6 +178,15 @@ export class PathSegment {
 
     if (def.surfaceType === SurfaceType.Speed && def.direction) {
       this.speedDirection = new THREE.Vector3(...def.direction).normalize();
+    }
+    if (def.surfaceType === SurfaceType.Teleport && def.teleportTarget) {
+      this.teleportTarget = new THREE.Vector3(...def.teleportTarget);
+    }
+    if (def.platformMoving) this.movingDef = def.platformMoving;
+    if (def.platformRotating) this.rotatingDef = def.platformRotating;
+    if (def.invisible) {
+      this.invisibleOnTime = def.invisible.onTime;
+      this.invisibleOffTime = def.invisible.offTime;
     }
 
     const geo = new THREE.BoxGeometry(w, h, d);
@@ -289,6 +344,44 @@ export class PathSegment {
       scene.add(this.frostParticles);
     }
 
+    // Swirling black hole particles for magnet surfaces
+    if (this.surfaceType === SurfaceType.Magnet) {
+      const count = Math.round(w * d * 3);
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const topY = py + h / 2;
+      const maxR = Math.min(w, d) / 2;
+
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * maxR;
+        positions[i * 3] = px + Math.cos(a) * r;
+        positions[i * 3 + 1] = topY + 0.1 + Math.random() * 0.3;
+        positions[i * 3 + 2] = pz + Math.sin(a) * r;
+
+        const t = Math.random();
+        colors[i * 3] = 0.3 + t * 0.3;
+        colors[i * 3 + 1] = 0;
+        colors[i * 3 + 2] = 0.5 + t * 0.5;
+
+        this.magnetData.push({ angle: a, r, speed: 1.5 + Math.random() * 2 });
+      }
+
+      const mGeo = new THREE.BufferGeometry();
+      mGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      mGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      this.magnetParticles = new THREE.Points(mGeo, new THREE.PointsMaterial({
+        size: 0.1,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+        sizeAttenuation: true,
+      }));
+      scene.add(this.magnetParticles);
+    }
+
     // Determine physics material
     let physicsMat: CANNON.Material;
     switch (this.surfaceType) {
@@ -304,9 +397,10 @@ export class PathSegment {
     }
 
     // Use a thicker collision box to prevent tunneling (cannon-es has no CCD)
-    // Only thicken downward for ground-level platforms; elevated ones use actual height
-    // to avoid creating invisible walls that deflect the ball sideways
-    const collisionH = py > 0.1 ? h : Math.max(h, 2);
+    // Thicken collision box downward for ground-level flat platforms to prevent tunneling.
+    // Skip thickening for tilted/elevated platforms to avoid misaligned physics.
+    const needsExactBody = !!(def.tilt || def.platformMoving || def.platformRotating);
+    const collisionH = (!needsExactBody && py <= 0.1) ? Math.max(h, 2) : h;
     this.body = new CANNON.Body({
       mass: 0,
       shape: new CANNON.Box(new CANNON.Vec3(w / 2, collisionH / 2, d / 2)),
@@ -314,8 +408,19 @@ export class PathSegment {
     });
     // Shift body down so the top surface stays at py + h/2
     this.body.position.set(px, py - (collisionH - h) / 2, pz);
-    if (def.rotation) {
-      this.body.quaternion.setFromEuler(0, def.rotation, 0);
+    {
+      const rotY = def.rotation ?? 0;
+      const rotX = def.tilt ?? 0;
+      this.originalRotationY = rotY;
+      if (rotX || rotY) {
+        const q = new CANNON.Quaternion();
+        q.setFromEuler(rotX, rotY, 0);
+        this.body.quaternion.copy(q);
+        if (rotX) this.mesh.rotation.x = rotX;
+      }
+    }
+    if (this.movingDef || this.rotatingDef) {
+      this.body.type = CANNON.Body.KINEMATIC;
     }
     physics.addBody(this.body);
 
@@ -407,6 +512,141 @@ export class PathSegment {
       this.arrowMaterial.opacity = 0.4 + Math.sin(this.animTime * 3) * 0.2;
     }
 
+    if (this.surfaceType === SurfaceType.Teleport) {
+      const pulse = 0.4 + Math.sin(this.animTime * 4) * 0.3;
+      this.material.emissiveIntensity = pulse;
+    }
+
+    if (this.surfaceType === SurfaceType.Shrinking) {
+      const glow = 0.3 + Math.sin(this.animTime * 2) * 0.15;
+      this.material.emissiveIntensity = glow;
+      if (this.shrinkActive) {
+        this.shrinkScale = Math.max(0.1, this.shrinkScale - CONFIG.surfaces.shrinking.shrinkRate * dt);
+        this.mesh.scale.set(this.shrinkScale, 1, this.shrinkScale);
+        if (this.shrinkScale <= 0.1) {
+          this.mesh.visible = false;
+          this.physics.removeBody(this.body);
+          for (const w of this.walls) {
+            w.mesh.visible = false;
+            this.physics.removeBody(w.body);
+          }
+          this.shrinkActive = false;
+          this.shrinkRestoreTimer = CONFIG.surfaces.shrinking.restoreDelay;
+        }
+      }
+      if (!this.shrinkActive && this.shrinkScale < 1) {
+        this.shrinkRestoreTimer -= dt;
+        if (this.shrinkRestoreTimer <= 0) {
+          this.shrinkScale = 1;
+          this.mesh.scale.set(1, 1, 1);
+          this.mesh.visible = true;
+          this.physics.addBody(this.body);
+          for (const w of this.walls) {
+            w.mesh.visible = true;
+            this.physics.addBody(w.body);
+          }
+        }
+      }
+    }
+
+    if (this.surfaceType === SurfaceType.Magnet) {
+      const pulse = 0.5 + Math.sin(this.animTime * 2) * 0.3;
+      this.material.emissiveIntensity = pulse;
+
+      if (this.magnetParticles) {
+        const posArr = this.magnetParticles.geometry.attributes.position as THREE.BufferAttribute;
+        const topY = this.originalPosition.y + this.size[1] / 2;
+        for (let i = 0; i < this.magnetData.length; i++) {
+          const md = this.magnetData[i];
+          md.angle += md.speed * dt;
+          posArr.setXYZ(i,
+            this.originalPosition.x + Math.cos(md.angle) * md.r,
+            topY + 0.1 + Math.sin(md.angle * 2) * 0.15,
+            this.originalPosition.z + Math.sin(md.angle) * md.r,
+          );
+        }
+        posArr.needsUpdate = true;
+      }
+    }
+
+    if (this.surfaceType === SurfaceType.Invisible) {
+      this.invisibleTimer += dt;
+      const cycle = this.invisibleOnTime + this.invisibleOffTime;
+      const phase = this.invisibleTimer % cycle;
+      const shouldBeActive = phase < this.invisibleOnTime;
+      if (shouldBeActive !== this.invisibleActive) {
+        this.invisibleActive = shouldBeActive;
+        if (this.invisibleActive) {
+          this.mesh.visible = true;
+          this.material.opacity = 0.6;
+          this.physics.addBody(this.body);
+          for (const w of this.walls) { w.mesh.visible = true; this.physics.addBody(w.body); }
+        } else {
+          this.mesh.visible = false;
+          this.physics.removeBody(this.body);
+          for (const w of this.walls) { w.mesh.visible = false; this.physics.removeBody(w.body); }
+        }
+      }
+      // Flicker warning before disappearing
+      if (this.invisibleActive && (this.invisibleOnTime - phase) < 0.5) {
+        this.material.opacity = 0.3 + Math.sin(this.animTime * 20) * 0.3;
+      }
+    }
+
+    // Moving platform
+    if (this.movingDef) {
+      const { axis: [ax, ay, az], range, speed, pause } = this.movingDef;
+      let offset: number;
+      let vel: number;
+
+      if (pause && pause > 0) {
+        // Motion with pause at endpoints:
+        // Cycle: move(half) → pause → move(half) → pause
+        const moveTime = Math.PI / speed; // time for half cycle (one direction)
+        const fullCycle = 2 * moveTime + 2 * pause;
+        const t = this.animTime % fullCycle;
+
+        if (t < moveTime) {
+          // Moving from center to +range
+          const phase = t * speed;
+          offset = Math.sin(phase) * range;
+          vel = Math.cos(phase) * range * speed;
+        } else if (t < moveTime + pause) {
+          // Paused at +range
+          offset = range;
+          vel = 0;
+        } else if (t < 2 * moveTime + pause) {
+          // Moving from +range back through center to -range
+          const phase = (t - moveTime - pause) * speed;
+          offset = Math.cos(phase) * range;
+          vel = -Math.sin(phase) * range * speed;
+        } else {
+          // Paused at -range
+          offset = -range;
+          vel = 0;
+        }
+      } else {
+        // Simple sine motion, no pause
+        offset = Math.sin(this.animTime * speed) * range;
+        vel = Math.cos(this.animTime * speed) * range * speed;
+      }
+
+      this.mesh.position.set(
+        this.originalPosition.x + ax * offset,
+        this.originalPosition.y + ay * offset,
+        this.originalPosition.z + az * offset,
+      );
+      this.body.position.set(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
+      this.body.velocity.set(ax * vel, ay * vel, az * vel);
+    }
+
+    // Rotating platform
+    if (this.rotatingDef) {
+      this.mesh.rotation.y += this.rotatingDef.speed * dt;
+      this.body.quaternion.setFromEuler(0, this.mesh.rotation.y, 0);
+      this.body.angularVelocity.set(0, this.rotatingDef.speed, 0);
+    }
+
     if (this.surfaceType === SurfaceType.Crumbling && this.crumbleTimer >= 0 && !this.crumbled) {
       this.crumbleTimer -= dt;
 
@@ -424,13 +664,31 @@ export class PathSegment {
         this.crumbled = true;
         this.mesh.visible = false;
         this.physics.removeBody(this.body);
-        // Remove wall bodies too
         for (const w of this.walls) {
           w.mesh.visible = false;
           this.physics.removeBody(w.body);
         }
+        this.respawnTimer = CONFIG.surfaces.crumbling.respawn;
       }
     }
+
+    // Auto-respawn after crumble
+    if (this.crumbled && this.respawnTimer >= 0) {
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0) {
+        this.restore();
+      }
+    }
+  }
+
+  startShrink() {
+    if (this.surfaceType === SurfaceType.Shrinking && this.shrinkScale > 0.1) {
+      this.shrinkActive = true;
+    }
+  }
+
+  stopShrink() {
+    this.shrinkActive = false;
   }
 
   startCrumble() {
@@ -444,6 +702,7 @@ export class PathSegment {
 
     this.crumbled = false;
     this.crumbleTimer = -1;
+    this.respawnTimer = -1;
     this.mesh.visible = true;
     this.material.opacity = 1;
     this.material.transparent = false;

@@ -54,7 +54,11 @@ export const CONFIG = {
     lava: { color: 0xcc3300, emissive: 0xff4400, damageTime: 3 },
     bounce: { color: 0x88cc44, emissive: 0x44aa22, impulse: 18 },
     speed: { color: 0x223366, emissive: 0x2244cc, force: 7 },
-    crumbling: { color: 0xccaa77, emissive: 0x000000, delay: 2.0 },
+    crumbling: { color: 0xccaa77, emissive: 0x000000, delay: 2.0, respawn: 3.0 },
+    teleport: { color: 0x9944ff, emissive: 0x6622cc },
+    shrinking: { color: 0xff8800, emissive: 0xcc6600, shrinkRate: 0.3, restoreDelay: 2.0 },
+    magnet: { color: 0x220033, emissive: 0x440066, pullForce: 15 },
+    invisible: { color: 0x88aacc, emissive: 0x445566 },
   },
   breakable: {
     speedThreshold: 5,

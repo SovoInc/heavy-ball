@@ -13,7 +13,7 @@ import { Debris } from "../objects/Debris";
 import type { Ball } from "../objects/Ball";
 import type { PowerUpType } from "../powerups/PowerUpType";
 import { CONFIG } from "../config";
-import { playBounce, playShatter, playLavaHiss, playCrumble } from "../audio";
+import { playBounce, playShatter, playLavaHiss, playCrumble, playTeleport } from "../audio";
 
 export interface LevelData {
   name: string;
@@ -58,6 +58,8 @@ export class Level {
   private lavaTimers = new Map<PathSegment | CurvedPathSegment, number>();
   private lavaHissPlayed = new Set<PathSegment | CurvedPathSegment>();
   private bounceCooldown = 0;
+  private teleportCooldown = 0;
+  private activeShrinkSegments = new Set<PathSegment>();
 
   constructor(
     scene: THREE.Scene,
@@ -203,11 +205,13 @@ export class Level {
       const ballPos = this.ball.body.position;
       const ballR = CONFIG.ball.radius;
 
-      // Track which lava segments ball is currently on
+      // Track which lava/shrink segments ball is currently on
       const activeLavaSegments = new Set<PathSegment | CurvedPathSegment>();
+      const activeShrinkSegments = new Set<PathSegment>();
 
       for (const seg of this.pathSegments) {
         if (seg.crumbled) continue;
+        if (!seg.invisibleActive) continue;
 
         // AABB overlap check: ball vs segment top surface
         const mp = seg.mesh.position;
@@ -268,7 +272,48 @@ export class Level {
             }
             break;
           }
+          case SurfaceType.Teleport: {
+            if (this.teleportCooldown <= 0 && seg.teleportTarget) {
+              this.ball!.body.position.set(
+                seg.teleportTarget.x,
+                seg.teleportTarget.y + ballR + 0.5,
+                seg.teleportTarget.z,
+              );
+              this.ball!.body.velocity.set(0, 0, 0);
+              this.teleportCooldown = 0.5;
+              playTeleport();
+            }
+            break;
+          }
+          case SurfaceType.Shrinking: {
+            activeShrinkSegments.add(seg);
+            seg.startShrink();
+            break;
+          }
+          case SurfaceType.Magnet: {
+            const dx = mp.x - ballPos.x;
+            const dz = mp.z - ballPos.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist > 0.1) {
+              const strength = CONFIG.surfaces.magnet.pullForce;
+              this.ball!.body.applyForce(
+                new CANNON.Vec3(dx / dist * strength, 0, dz / dist * strength),
+              );
+            }
+            break;
+          }
         }
+      }
+
+      // Stop shrinking on segments the ball left
+      for (const seg of this.activeShrinkSegments) {
+        if (!activeShrinkSegments.has(seg)) {
+          seg.stopShrink();
+          this.activeShrinkSegments.delete(seg);
+        }
+      }
+      for (const seg of activeShrinkSegments) {
+        this.activeShrinkSegments.add(seg);
       }
 
       // Curved path surface interactions
@@ -335,6 +380,7 @@ export class Level {
     }
 
     if (this.bounceCooldown > 0) this.bounceCooldown -= dt;
+    if (this.teleportCooldown > 0) this.teleportCooldown -= dt;
 
     // Update path segment animations
     for (const seg of this.pathSegments) {

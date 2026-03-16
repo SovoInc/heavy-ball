@@ -22,6 +22,7 @@ export class CurvedPathSegment {
   surfaceType: SurfaceType;
   crumbleTimer = -1;
   crumbled = false;
+  private respawnTimer = -1;
 
   readonly center: [number, number, number];
   readonly radius: number;
@@ -93,6 +94,26 @@ export class CurvedPathSegment {
         color = CONFIG.surfaces.crumbling.color;
         emissive = CONFIG.surfaces.crumbling.emissive;
         emissiveIntensity = 0;
+        break;
+      case SurfaceType.Teleport:
+        color = CONFIG.surfaces.teleport.color;
+        emissive = CONFIG.surfaces.teleport.emissive;
+        emissiveIntensity = 0.6;
+        break;
+      case SurfaceType.Shrinking:
+        color = CONFIG.surfaces.shrinking.color;
+        emissive = CONFIG.surfaces.shrinking.emissive;
+        emissiveIntensity = 0.4;
+        break;
+      case SurfaceType.Magnet:
+        color = CONFIG.surfaces.magnet.color;
+        emissive = CONFIG.surfaces.magnet.emissive;
+        emissiveIntensity = 0.8;
+        break;
+      case SurfaceType.Invisible:
+        color = CONFIG.surfaces.invisible.color;
+        emissive = CONFIG.surfaces.invisible.emissive;
+        emissiveIntensity = 0.3;
         break;
       default:
         color = CONFIG.colors.path;
@@ -474,6 +495,15 @@ export class CurvedPathSegment {
           this.physics.removeBody(w.body);
         }
         for (const obj of this.extraSceneObjects) obj.visible = false;
+        this.respawnTimer = CONFIG.surfaces.crumbling.respawn;
+      }
+    }
+
+    // Auto-respawn after crumble
+    if (this.crumbled && this.respawnTimer >= 0) {
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0) {
+        this.restore();
       }
     }
   }
@@ -489,6 +519,7 @@ export class CurvedPathSegment {
 
     this.crumbled = false;
     this.crumbleTimer = -1;
+    this.respawnTimer = -1;
     this.mesh.visible = true;
     this.material.opacity = 1;
     this.material.transparent = false;

@@ -176,6 +176,39 @@ export function playCrumble() {
   noise.stop(now + 0.8);
 }
 
+/** Sci-fi whoosh — teleport pad */
+export function playTeleport() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+
+  // Rising sweep
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(200, now);
+  osc.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
+  osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.2, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  osc.connect(g).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.3);
+
+  // Noise burst
+  const noise = ac.createBufferSource();
+  noise.buffer = makeNoise(ac, 0.2);
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 3000;
+  bp.Q.value = 3;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.1, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+  noise.connect(bp).connect(ng).connect(ac.destination);
+  noise.start(now);
+  noise.stop(now + 0.2);
+}
+
 /** Soft filtered noise — continuous while ball moves */
 let rollNoise: AudioBufferSourceNode | null = null;
 let rollGain: GainNode | null = null;
