@@ -6,7 +6,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 const W = CONFIG.path.wideWidth;
 const H = 0.5;
 
-export const LEVEL_17: LevelData = {
+const level: LevelData = {
   name: "Level 17 — Bounce Highway",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -159,3 +159,5 @@ export const LEVEL_17: LevelData = {
     },
   ],
 };
+
+export default level;

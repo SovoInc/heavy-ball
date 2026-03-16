@@ -5,7 +5,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_2: LevelData = {
+const level: LevelData = {
   name: "Level 2 — Narrow Bridges",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -75,3 +75,5 @@ export const LEVEL_2: LevelData = {
     { position: [0, 0.75, -65], size: [2, 1, 0.6], color: 0x776655, breakable: true },
   ],
 };
+
+export default level;

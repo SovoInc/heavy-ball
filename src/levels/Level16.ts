@@ -7,7 +7,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_16: LevelData = {
+const level: LevelData = {
   name: "Level 16 — Ice and Fire",
   startPosition: [0, 2, 0],
   finishZone: { position: [0, 1.5, -114], size: [W, 3, 4] },
@@ -60,3 +60,5 @@ export const LEVEL_16: LevelData = {
     { position: [0, 0.75, -101], size: [1, 1, 1], color: 0x887766, breakable: true, powerUp: PowerUpType.Shield },
   ],
 };
+
+export default level;

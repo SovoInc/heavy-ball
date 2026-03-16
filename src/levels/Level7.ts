@@ -5,7 +5,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 const W = CONFIG.path.wideWidth;
 const H = 0.5;
 
-export const LEVEL_7: LevelData = {
+const level: LevelData = {
   name: "Level 7 — Rotating Gauntlet",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -123,3 +123,5 @@ export const LEVEL_7: LevelData = {
     },
   ],
 };
+
+export default level;

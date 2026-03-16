@@ -7,7 +7,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_15: LevelData = {
+const level: LevelData = {
   name: "Level 15 — Crumbling Ruins",
   startPosition: [0, 2, 0],
   finishZone: { position: [0, 1.5, -108], size: [W, 3, 4] },
@@ -48,3 +48,5 @@ export const LEVEL_15: LevelData = {
     { position: [0, 0.75, -86], size: [1, 1, 1], color: 0x887766, breakable: true, powerUp: PowerUpType.Shield },
   ],
 };
+
+export default level;

@@ -6,7 +6,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 const W = CONFIG.path.wideWidth;
 const H = 0.5;
 
-export const LEVEL_11: LevelData = {
+const level: LevelData = {
   name: "Level 11 — Frozen Path",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -128,3 +128,5 @@ export const LEVEL_11: LevelData = {
     },
   ],
 };
+
+export default level;

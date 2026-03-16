@@ -6,7 +6,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_10: LevelData = {
+const level: LevelData = {
   name: "Level 10 — The Finale",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -223,3 +223,5 @@ export const LEVEL_10: LevelData = {
     },
   ],
 };
+
+export default level;

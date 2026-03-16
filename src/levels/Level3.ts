@@ -5,7 +5,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_3: LevelData = {
+const level: LevelData = {
   name: "Level 3 — The Gauntlet",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -109,3 +109,5 @@ export const LEVEL_3: LevelData = {
     { position: [13, 0.75, -120], size: [1, 1, 0.6], color: 0x665544, breakable: true },
   ],
 };
+
+export default level;

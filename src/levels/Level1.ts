@@ -3,7 +3,7 @@ import type { LevelData } from "./Level";
 const W = 6;
 const H = 0.5;
 
-export const LEVEL_1: LevelData = {
+const level: LevelData = {
   name: "Level 1 — The Basics",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -55,3 +55,5 @@ export const LEVEL_1: LevelData = {
     { position: [0, 0.75, -70], size: [1.2, 1, 0.6], color: 0x887766, breakable: true },
   ],
 };
+
+export default level;

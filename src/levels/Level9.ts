@@ -6,7 +6,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_9: LevelData = {
+const level: LevelData = {
   name: "Level 9 — Sky Bridge",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -130,3 +130,5 @@ export const LEVEL_9: LevelData = {
     },
   ],
 };
+
+export default level;

@@ -6,7 +6,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 const W = CONFIG.path.wideWidth;
 const H = 0.5;
 
-export const LEVEL_14: LevelData = {
+const level: LevelData = {
   name: "Level 14 — Conveyor Chaos",
   startPosition: [0, 2, 0],
   finishZone: { position: [0, 1.5, -122], size: [W, 3, 4] },
@@ -55,3 +55,5 @@ export const LEVEL_14: LevelData = {
     { position: [-1, 0.75, -97], size: [0.8, 1, 0.8], color: 0x887766, breakable: true, powerUp: PowerUpType.TimeBonus },
   ],
 };
+
+export default level;

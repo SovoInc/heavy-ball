@@ -7,7 +7,7 @@ const W = CONFIG.path.wideWidth;
 const N = CONFIG.path.narrowWidth;
 const H = 0.5;
 
-export const LEVEL_19: LevelData = {
+const level: LevelData = {
   name: "Level 19 — Elemental Gauntlet",
   startPosition: [0, 2, 0],
   finishZone: {
@@ -285,3 +285,5 @@ export const LEVEL_19: LevelData = {
     },
   ],
 };
+
+export default level;
