@@ -177,6 +177,10 @@ export class Level {
     }
     this.finishZone.update(dt);
 
+    for (const wz of this.windZones) {
+      wz.update(dt);
+    }
+
     if (this.ball) {
       for (const wz of this.windZones) {
         wz.applyForce(this.ball);
@@ -240,7 +244,6 @@ export class Level {
                   seg.speedDirection.y * force,
                   seg.speedDirection.z * force,
                 ),
-                this.ball!.body.position,
               );
             }
             break;
