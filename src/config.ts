@@ -50,7 +50,7 @@ export const CONFIG = {
     },
   },
   surfaces: {
-    ice: { color: 0x88ccee, emissive: 0x224466, opacity: 0.7 },
+    ice: { color: 0xaaddee, emissive: 0x446688, opacity: 1 },
     lava: { color: 0xcc3300, emissive: 0xff4400, damageTime: 3 },
     bounce: { color: 0x88cc44, emissive: 0x44aa22, impulse: 18 },
     speed: { color: 0x223366, emissive: 0x2244cc, force: 7 },

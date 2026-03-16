@@ -76,6 +76,8 @@ export class PathSegment {
   private arrowMaterial: THREE.MeshBasicMaterial | null = null;
   private fireParticles: THREE.Points | null = null;
   private fireData: { y: number; phase: number; speed: number; baseX: number; baseZ: number }[] = [];
+  private frostParticles: THREE.Points | null = null;
+  private frostData: { phase: number; baseX: number; baseY: number; baseZ: number }[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -102,8 +104,6 @@ export class PathSegment {
         color = CONFIG.surfaces.ice.color;
         emissive = CONFIG.surfaces.ice.emissive;
         emissiveIntensity = 0.3;
-        opacity = CONFIG.surfaces.ice.opacity;
-        transparent = true;
         break;
       case SurfaceType.Lava:
         color = CONFIG.surfaces.lava.color;
@@ -242,6 +242,53 @@ export class PathSegment {
       scene.add(this.fireParticles);
     }
 
+    // Add frost sparkle particles for ice surfaces
+    if (this.surfaceType === SurfaceType.Ice) {
+      const count = Math.round(w * d * 2);
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const topY = py + h / 2;
+
+      for (let i = 0; i < count; i++) {
+        const bx = px + (Math.random() - 0.5) * w;
+        const bz = pz + (Math.random() - 0.5) * d;
+        const by = topY + 0.02 + Math.random() * 0.15;
+        positions[i * 3] = bx;
+        positions[i * 3 + 1] = by;
+        positions[i * 3 + 2] = bz;
+
+        // White-blue sparkle colors
+        const t = Math.random();
+        colors[i * 3] = 0.7 + t * 0.3;       // R: 0.7–1.0
+        colors[i * 3 + 1] = 0.85 + t * 0.15;  // G: 0.85–1.0
+        colors[i * 3 + 2] = 1;                 // B: always full
+
+        this.frostData.push({
+          phase: Math.random() * Math.PI * 2,
+          baseX: bx,
+          baseY: by,
+          baseZ: bz,
+        });
+      }
+
+      const frostGeo = new THREE.BufferGeometry();
+      frostGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      frostGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+      const frostMat = new THREE.PointsMaterial({
+        size: 0.08,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+        sizeAttenuation: true,
+      });
+
+      this.frostParticles = new THREE.Points(frostGeo, frostMat);
+      scene.add(this.frostParticles);
+    }
+
     // Determine physics material
     let physicsMat: CANNON.Material;
     switch (this.surfaceType) {
@@ -320,6 +367,31 @@ export class PathSegment {
         }
         posArr.needsUpdate = true;
         colArr.needsUpdate = true;
+      }
+    }
+
+    if (this.surfaceType === SurfaceType.Ice) {
+      // Subtle shimmer on the surface
+      const shimmer = 0.2 + Math.sin(this.animTime * 1.5) * 0.1;
+      this.material.emissiveIntensity = shimmer;
+
+      // Animate frost sparkles — twinkle in and out
+      if (this.frostParticles) {
+        const frostMat = this.frostParticles.material as THREE.PointsMaterial;
+        const posArr = this.frostParticles.geometry.attributes.position as THREE.BufferAttribute;
+
+        for (let i = 0; i < this.frostData.length; i++) {
+          const fd = this.frostData[i];
+          fd.phase += dt * (1.5 + Math.sin(i) * 0.5);
+
+          // Twinkle: particle bobs slightly and fades in/out
+          const twinkle = Math.sin(fd.phase);
+          posArr.setY(i, fd.baseY + twinkle * 0.03);
+        }
+        posArr.needsUpdate = true;
+
+        // Global opacity pulse for shimmer effect
+        frostMat.opacity = 0.5 + Math.sin(this.animTime * 2.5) * 0.4;
       }
     }
 
