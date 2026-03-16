@@ -74,6 +74,8 @@ export class PathSegment {
   private originalPosition: THREE.Vector3;
   private arrowMesh: THREE.Mesh | null = null;
   private arrowMaterial: THREE.MeshBasicMaterial | null = null;
+  private fireParticles: THREE.Points | null = null;
+  private fireData: { y: number; phase: number; speed: number; baseX: number; baseZ: number }[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -193,6 +195,53 @@ export class PathSegment {
       scene.add(this.arrowMesh);
     }
 
+    // Add fire particles for lava surfaces
+    if (this.surfaceType === SurfaceType.Lava) {
+      const count = Math.round(w * d * 4);
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const topY = py + h / 2;
+
+      for (let i = 0; i < count; i++) {
+        const bx = px + (Math.random() - 0.5) * w;
+        const bz = pz + (Math.random() - 0.5) * d;
+        positions[i * 3] = bx;
+        positions[i * 3 + 1] = topY + Math.random() * 0.4;
+        positions[i * 3 + 2] = bz;
+
+        // Random warm color: orange to yellow
+        const t = Math.random();
+        colors[i * 3] = 1;                     // R
+        colors[i * 3 + 1] = 0.3 + t * 0.5;    // G: 0.3–0.8
+        colors[i * 3 + 2] = t * 0.15;          // B: 0–0.15
+
+        this.fireData.push({
+          y: topY + Math.random() * 0.4,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.4 + Math.random() * 0.8,
+          baseX: bx,
+          baseZ: bz,
+        });
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.15,
+        transparent: true,
+        opacity: 0.7,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+        sizeAttenuation: true,
+      });
+
+      this.fireParticles = new THREE.Points(geo, mat);
+      scene.add(this.fireParticles);
+    }
+
     // Determine physics material
     let physicsMat: CANNON.Material;
     switch (this.surfaceType) {
@@ -239,6 +288,39 @@ export class PathSegment {
       // Pulsing glow
       const pulse = 0.4 + Math.sin(this.animTime * 3) * 0.3;
       this.material.emissiveIntensity = pulse;
+
+      // Animate fire particles
+      if (this.fireParticles) {
+        const posArr = this.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
+        const colArr = this.fireParticles.geometry.attributes.color as THREE.BufferAttribute;
+        const topY = this.mesh.position.y + this.size[1] / 2;
+
+        for (let i = 0; i < this.fireData.length; i++) {
+          const fd = this.fireData[i];
+          fd.y += fd.speed * dt;
+          fd.phase += dt * 4;
+
+          // Wobble horizontally
+          const wx = fd.baseX + Math.sin(fd.phase) * 0.1;
+          const wz = fd.baseZ + Math.cos(fd.phase * 0.7) * 0.1;
+
+          posArr.setXYZ(i, wx, fd.y, wz);
+
+          // Fade from bright to dim as particle rises
+          const life = (fd.y - topY) / 0.6;
+          const alpha = Math.max(0, 1 - life);
+          colArr.setY(i, (0.3 + life * 0.5) * alpha + 0.1);
+          colArr.setZ(i, life * 0.1 * alpha);
+
+          // Reset particle when it rises too high
+          if (fd.y > topY + 0.6) {
+            fd.y = topY;
+            fd.phase = Math.random() * Math.PI * 2;
+          }
+        }
+        posArr.needsUpdate = true;
+        colArr.needsUpdate = true;
+      }
     }
 
     if (this.surfaceType === SurfaceType.Bounce) {
