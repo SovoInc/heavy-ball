@@ -185,7 +185,7 @@ export class PathSegment {
       const arrowGeo = new THREE.PlaneGeometry(planeW, planeD);
       this.arrowMesh = new THREE.Mesh(arrowGeo, this.arrowMaterial);
       this.arrowMesh.rotation.x = -Math.PI / 2;
-      this.arrowMesh.position.set(px, py + h / 2 + 0.01, pz);
+      this.arrowMesh.position.set(px, py + h / 2 + 0.05, pz);
 
       this.arrowMesh.rotation.z = -angle;
 
@@ -252,7 +252,7 @@ export class PathSegment {
       for (let i = 0; i < count; i++) {
         const bx = px + (Math.random() - 0.5) * w;
         const bz = pz + (Math.random() - 0.5) * d;
-        const by = topY + 0.02 + Math.random() * 0.15;
+        const by = topY + 0.05 + Math.random() * 0.15;
         positions[i * 3] = bx;
         positions[i * 3 + 1] = by;
         positions[i * 3 + 2] = bz;

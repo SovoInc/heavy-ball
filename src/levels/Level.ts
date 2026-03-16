@@ -68,10 +68,90 @@ export class Level {
     this.startPosition = data.startPosition;
   }
 
+  /**
+   * Detect overlapping path segments at the same height and trim earlier
+   * segments so their visual/physics geometry no longer overlaps. Later
+   * segments (e.g. turn platforms) take priority and keep their full size.
+   */
+  private resolveOverlaps(paths: PathSegmentDef[]): PathSegmentDef[] {
+    const result: PathSegmentDef[] = paths.map(p => ({
+      ...p,
+      position: [...p.position] as [number, number, number],
+      size: [...p.size] as [number, number, number],
+    }));
+
+    for (let i = 0; i < result.length; i++) {
+      const a = result[i];
+      const [ax, ay, az] = a.position;
+      const [aw, ah, ad] = a.size;
+      const aMinX = ax - aw / 2, aMaxX = ax + aw / 2;
+      const aMinZ = az - ad / 2, aMaxZ = az + ad / 2;
+      const aTop = ay + ah / 2;
+
+      for (let j = i + 1; j < result.length; j++) {
+        const b = result[j];
+        const [bx, by, bz] = b.position;
+        const [bw, bh, bd] = b.size;
+        const bMinX = bx - bw / 2, bMaxX = bx + bw / 2;
+        const bMinZ = bz - bd / 2, bMaxZ = bz + bd / 2;
+        const bTop = by + bh / 2;
+
+        // Only fix overlaps at the same height (coplanar tops)
+        if (Math.abs(aTop - bTop) > 0.01) continue;
+
+        // Check XZ overlap
+        const overlapX = Math.min(aMaxX, bMaxX) - Math.max(aMinX, bMinX);
+        const overlapZ = Math.min(aMaxZ, bMaxZ) - Math.max(aMinZ, bMinZ);
+        if (overlapX <= 0 || overlapZ <= 0) continue;
+
+        // Trim the earlier segment (i) to remove overlap with later segment (j).
+        // Find which axis has less overlap relative to segment size and trim that.
+        // Trim along Z (more common: corridor meets turn)
+        if (overlapZ < ad && overlapZ < aw) {
+          if (az < bz) {
+            // a is in front, trim its back edge (maxZ side)
+            const newMaxZ = bMinZ;
+            const newD = newMaxZ - aMinZ;
+            if (newD > 0.5) {
+              a.size[2] = newD;
+              a.position[2] = aMinZ + newD / 2;
+            }
+          } else {
+            // a is behind, trim its front edge (minZ side)
+            const newMinZ = bMaxZ;
+            const newD = aMaxZ - newMinZ;
+            if (newD > 0.5) {
+              a.size[2] = newD;
+              a.position[2] = newMinZ + newD / 2;
+            }
+          }
+        } else if (overlapX < aw) {
+          if (ax < bx) {
+            const newMaxX = bMinX;
+            const newW = newMaxX - aMinX;
+            if (newW > 0.5) {
+              a.size[0] = newW;
+              a.position[0] = aMinX + newW / 2;
+            }
+          } else {
+            const newMinX = bMaxX;
+            const newW = aMaxX - newMinX;
+            if (newW > 0.5) {
+              a.size[0] = newW;
+              a.position[0] = newMinX + newW / 2;
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   build(ball: Ball) {
     this.ball = ball;
 
-    for (const def of this.data.paths) {
+    const resolvedPaths = this.resolveOverlaps(this.data.paths);
+    for (const def of resolvedPaths) {
       this.pathSegments.push(new PathSegment(this.scene, this.physics, def));
     }
 
