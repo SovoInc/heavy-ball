@@ -4,6 +4,7 @@ import { SurfaceType } from "./objects/Path";
 import type { PathSegmentDef } from "./objects/Path";
 import type { LevelData } from "./levels/Level";
 import { ALL_LEVELS } from "./levels/allLevels";
+import { curvedSegmentToAABBs } from "./objects/CurvedPath";
 
 // Physics constants for reachability calculations
 const GRAVITY = Math.abs(CONFIG.physics.gravity);
@@ -59,6 +60,13 @@ function getWalkableSegments(level: LevelData): PathSegmentDef[] {
         size: [b.width, 0.3, b.length],
         isBridge: true,
       });
+    }
+  }
+  if (level.curvedPaths) {
+    for (const cp of level.curvedPaths) {
+      for (const aabb of curvedSegmentToAABBs(cp)) {
+        segments.push(aabb);
+      }
     }
   }
   return segments;

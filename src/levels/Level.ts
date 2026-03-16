@@ -2,6 +2,7 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { Physics } from "../physics";
 import { PathSegment, SurfaceType, type PathSegmentDef } from "../objects/Path";
+import { CurvedPathSegment, type CurvedPathSegmentDef } from "../objects/CurvedPath";
 import { Bridge, type BridgeDef } from "../objects/Bridge";
 import { LatticeWall, type LatticeWallDef } from "../objects/LatticeWall";
 import { Obstacle, type ObstacleDef } from "../objects/Obstacle";
@@ -24,10 +25,12 @@ export interface LevelData {
   obstacles?: ObstacleDef[];
   windZones?: WindZoneDef[];
   timedGates?: TimedGateDef[];
+  curvedPaths?: CurvedPathSegmentDef[];
 }
 
 export class Level {
   pathSegments: PathSegment[] = [];
+  curvedPathSegments: CurvedPathSegment[] = [];
   bridges: Bridge[] = [];
   latticeWalls: LatticeWall[] = [];
   obstacles: Obstacle[] = [];
@@ -52,8 +55,8 @@ export class Level {
   private bodyToObstacle = new Map<CANNON.Body, Obstacle>();
   private collideHandler: ((event: { body: CANNON.Body; contact: CANNON.ContactEquation }) => void) | null = null;
   private ball: Ball | null = null;
-  private lavaTimers = new Map<PathSegment, number>();
-  private lavaHissPlayed = new Set<PathSegment>();
+  private lavaTimers = new Map<PathSegment | CurvedPathSegment, number>();
+  private lavaHissPlayed = new Set<PathSegment | CurvedPathSegment>();
   private bounceCooldown = 0;
 
   constructor(
@@ -68,91 +71,17 @@ export class Level {
     this.startPosition = data.startPosition;
   }
 
-  /**
-   * Detect overlapping path segments at the same height and trim earlier
-   * segments so their visual/physics geometry no longer overlaps. Later
-   * segments (e.g. turn platforms) take priority and keep their full size.
-   */
-  private resolveOverlaps(paths: PathSegmentDef[]): PathSegmentDef[] {
-    const result: PathSegmentDef[] = paths.map(p => ({
-      ...p,
-      position: [...p.position] as [number, number, number],
-      size: [...p.size] as [number, number, number],
-    }));
-
-    for (let i = 0; i < result.length; i++) {
-      const a = result[i];
-      const [ax, ay, az] = a.position;
-      const [aw, ah, ad] = a.size;
-      const aMinX = ax - aw / 2, aMaxX = ax + aw / 2;
-      const aMinZ = az - ad / 2, aMaxZ = az + ad / 2;
-      const aTop = ay + ah / 2;
-
-      for (let j = i + 1; j < result.length; j++) {
-        const b = result[j];
-        const [bx, by, bz] = b.position;
-        const [bw, bh, bd] = b.size;
-        const bMinX = bx - bw / 2, bMaxX = bx + bw / 2;
-        const bMinZ = bz - bd / 2, bMaxZ = bz + bd / 2;
-        const bTop = by + bh / 2;
-
-        // Only fix overlaps at the same height (coplanar tops)
-        if (Math.abs(aTop - bTop) > 0.01) continue;
-
-        // Check XZ overlap
-        const overlapX = Math.min(aMaxX, bMaxX) - Math.max(aMinX, bMinX);
-        const overlapZ = Math.min(aMaxZ, bMaxZ) - Math.max(aMinZ, bMinZ);
-        if (overlapX <= 0 || overlapZ <= 0) continue;
-
-        // Trim the earlier segment (i) to remove overlap with later segment (j).
-        // Find which axis has less overlap relative to segment size and trim that.
-        // Trim along Z (more common: corridor meets turn)
-        if (overlapZ < ad && overlapZ < aw) {
-          if (az < bz) {
-            // a is in front, trim its back edge (maxZ side)
-            const newMaxZ = bMinZ;
-            const newD = newMaxZ - aMinZ;
-            if (newD > 0.5) {
-              a.size[2] = newD;
-              a.position[2] = aMinZ + newD / 2;
-            }
-          } else {
-            // a is behind, trim its front edge (minZ side)
-            const newMinZ = bMaxZ;
-            const newD = aMaxZ - newMinZ;
-            if (newD > 0.5) {
-              a.size[2] = newD;
-              a.position[2] = newMinZ + newD / 2;
-            }
-          }
-        } else if (overlapX < aw) {
-          if (ax < bx) {
-            const newMaxX = bMinX;
-            const newW = newMaxX - aMinX;
-            if (newW > 0.5) {
-              a.size[0] = newW;
-              a.position[0] = aMinX + newW / 2;
-            }
-          } else {
-            const newMinX = bMaxX;
-            const newW = aMaxX - newMinX;
-            if (newW > 0.5) {
-              a.size[0] = newW;
-              a.position[0] = newMinX + newW / 2;
-            }
-          }
-        }
-      }
-    }
-    return result;
-  }
-
   build(ball: Ball) {
     this.ball = ball;
 
-    const resolvedPaths = this.resolveOverlaps(this.data.paths);
-    for (const def of resolvedPaths) {
+    for (const def of this.data.paths) {
       this.pathSegments.push(new PathSegment(this.scene, this.physics, def));
+    }
+
+    if (this.data.curvedPaths) {
+      for (const def of this.data.curvedPaths) {
+        this.curvedPathSegments.push(new CurvedPathSegment(this.scene, this.physics, def));
+      }
     }
 
     if (this.data.bridges) {
@@ -242,6 +171,10 @@ export class Level {
       this.sceneObjects.push(p.mesh);
       for (const w of p.walls) this.sceneObjects.push(w.mesh);
     }
+    for (const cp of this.curvedPathSegments) {
+      this.sceneObjects.push(cp.mesh);
+      for (const w of cp.walls) this.sceneObjects.push(w.mesh);
+    }
     for (const b of this.bridges) this.sceneObjects.push(b.mesh);
     for (const l of this.latticeWalls) this.sceneObjects.push(l.group);
     for (const o of this.obstacles) this.sceneObjects.push(o.mesh);
@@ -271,7 +204,7 @@ export class Level {
       const ballR = CONFIG.ball.radius;
 
       // Track which lava segments ball is currently on
-      const activeLavaSegments = new Set<PathSegment>();
+      const activeLavaSegments = new Set<PathSegment | CurvedPathSegment>();
 
       for (const seg of this.pathSegments) {
         if (seg.crumbled) continue;
@@ -338,6 +271,60 @@ export class Level {
         }
       }
 
+      // Curved path surface interactions
+      for (const cseg of this.curvedPathSegments) {
+        if (cseg.crumbled) continue;
+
+        const topY = cseg.center[1] + cseg.height / 2;
+        const onTop =
+          ballPos.y >= topY - 0.1 &&
+          ballPos.y <= topY + ballR + 0.5 &&
+          cseg.containsBall(ballPos.x, ballPos.z, ballR);
+
+        if (!onTop) continue;
+
+        switch (cseg.surfaceType) {
+          case SurfaceType.Lava: {
+            activeLavaSegments.add(cseg);
+            const timer = (this.lavaTimers.get(cseg) ?? 0) + dt;
+            this.lavaTimers.set(cseg, timer);
+            if (!this.lavaHissPlayed.has(cseg)) {
+              this.lavaHissPlayed.add(cseg);
+              playLavaHiss();
+            }
+            if (timer >= CONFIG.surfaces.lava.damageTime) {
+              this.pendingReset = true;
+              this.pendingShake = 0.3;
+            }
+            break;
+          }
+          case SurfaceType.Bounce: {
+            if (this.bounceCooldown <= 0) {
+              const vel = this.ball!.body.velocity;
+              vel.y = CONFIG.surfaces.bounce.impulse;
+              this.bounceCooldown = 0.3;
+              playBounce(8);
+            }
+            break;
+          }
+          case SurfaceType.Speed: {
+            const tangent = cseg.getTangentAt(ballPos.x, ballPos.z);
+            const force = CONFIG.surfaces.speed.force;
+            this.ball!.body.applyForce(
+              new CANNON.Vec3(tangent.x * force, 0, tangent.z * force),
+            );
+            break;
+          }
+          case SurfaceType.Crumbling: {
+            if (cseg.crumbleTimer < 0) {
+              cseg.startCrumble();
+              playCrumble();
+            }
+            break;
+          }
+        }
+      }
+
       // Reset lava timers for segments the ball left
       for (const [seg] of this.lavaTimers) {
         if (!activeLavaSegments.has(seg)) {
@@ -352,6 +339,9 @@ export class Level {
     // Update path segment animations
     for (const seg of this.pathSegments) {
       seg.update(dt);
+    }
+    for (const cseg of this.curvedPathSegments) {
+      cseg.update(dt);
     }
 
     for (const tg of this.timedGates) {
@@ -377,6 +367,9 @@ export class Level {
     // Restore crumbled path segments
     for (const seg of this.pathSegments) {
       seg.restore();
+    }
+    for (const cseg of this.curvedPathSegments) {
+      cseg.restore();
     }
     // Clear lava timers on reset
     this.lavaTimers.clear();
@@ -406,6 +399,12 @@ export class Level {
         for (const w of p.walls) this.physics.removeBody(w.body);
       }
     }
+    for (const cp of this.curvedPathSegments) {
+      if (!cp.crumbled) {
+        for (const b of cp.bodies) this.physics.removeBody(b);
+        for (const w of cp.walls) this.physics.removeBody(w.body);
+      }
+    }
     for (const b of this.bridges) this.physics.removeBody(b.body);
     for (const l of this.latticeWalls) {
       for (const body of l.bodies) this.physics.removeBody(body);
@@ -424,6 +423,7 @@ export class Level {
     this.bodyToObstacle.clear();
 
     this.pathSegments = [];
+    this.curvedPathSegments = [];
     this.bridges = [];
     this.latticeWalls = [];
     this.obstacles = [];
