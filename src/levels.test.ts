@@ -255,6 +255,70 @@ describe("Level playability", () => {
         expect(failures, failures.join("\n")).toHaveLength(0);
       });
 
+      it("speed (conveyor) platforms with sideways push connect to neighbors", () => {
+        // Conveyor platforms that push the ball sideways (X-axis direction)
+        // with noWalls make gaps uncrossable — the ball gets pushed off the edge.
+        // These platforms must connect seamlessly to their neighbors.
+        // Conveyors pushing forward/backward (Z-axis) are fine with small gaps
+        // since the force doesn't push the ball off the platform edge.
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.paths.length; j++) {
+          const seg = level.paths[j];
+          if (seg.surfaceType !== SurfaceType.Speed) continue;
+          if (!seg.direction) continue;
+
+          // Only check conveyors that push sideways (X component)
+          const pushesX = Math.abs(seg.direction[0]) > 0.1;
+          if (!pushesX) continue;
+
+          const segBox = segmentAABB(seg);
+
+          // Find the closest neighbor in front and behind (Z-axis)
+          let closestFrontGap = Infinity;
+          let closestBackGap = Infinity;
+          let frontIdx = -1;
+          let backIdx = -1;
+
+          for (let k = 0; k < level.paths.length; k++) {
+            if (k === j) continue;
+            const otherBox = segmentAABB(level.paths[k]);
+
+            // Must overlap in X to be a forward/backward neighbor
+            if (otherBox.maxX < segBox.minX || otherBox.minX > segBox.maxX) continue;
+
+            // Behind the segment (higher Z = closer to start)
+            const backDist = segBox.maxZ - otherBox.minZ;
+            if (backDist >= -0.5 && backDist < closestBackGap) {
+              const gap = horizontalGap(segBox, otherBox);
+              if (gap < closestBackGap) { closestBackGap = gap; backIdx = k; }
+            }
+
+            // In front of the segment (lower Z = closer to finish)
+            const frontDist = otherBox.maxZ - segBox.minZ;
+            if (frontDist >= -0.5 && frontDist < closestFrontGap) {
+              const gap = horizontalGap(segBox, otherBox);
+              if (gap < closestFrontGap) { closestFrontGap = gap; frontIdx = k; }
+            }
+          }
+
+          if (closestFrontGap > 0.5 && frontIdx >= 0) {
+            failures.push(
+              `Segment ${j} [speed, pushes X] has ${closestFrontGap.toFixed(1)} unit gap to front neighbor ${frontIdx} ` +
+              `(pos ${seg.position.join(",")}) → (pos ${level.paths[frontIdx].position.join(",")})`
+            );
+          }
+          if (closestBackGap > 0.5 && backIdx >= 0) {
+            failures.push(
+              `Segment ${j} [speed, pushes X] has ${closestBackGap.toFixed(1)} unit gap to back neighbor ${backIdx} ` +
+              `(pos ${seg.position.join(",")}) → (pos ${level.paths[backIdx].position.join(",")})`
+            );
+          }
+        }
+
+        expect(failures, `Speed platform gaps:\n${failures.join("\n")}`).toHaveLength(0);
+      });
+
       it("finish zone is reachable from start", () => {
         const segments = getWalkableSegments(level);
         const [sx, , sz] = level.startPosition;
