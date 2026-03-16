@@ -398,6 +398,73 @@ describe("Speed (conveyor) surface crossability", () => {
     // Player's moveForce (35) > conveyor (7), so ball should move left
     expect(ball.position.x).toBeLessThan(0);
   });
+
+  it("ball on conveyor hitting a wall is not violently ejected", () => {
+    // This tests that conveyor force applied at center of mass does not
+    // generate torque that combines with wall collision to launch the ball.
+    const wallThickness = 1.5;
+    const wall = new CANNON.Body({
+      mass: 0,
+      shape: new CANNON.Box(new CANNON.Vec3(20 / 2, 2 / 2, wallThickness / 2)),
+      material: physics.wallMaterial,
+    });
+    wall.position.set(0, 1, -5);
+    physics.addBody(wall);
+
+    // Push ball into wall with conveyor force
+    const conveyorDir = new CANNON.Vec3(0, 0, -1);
+    const force = CONFIG.surfaces.speed.force;
+    const keys = new Set(["KeyW"]);
+
+    let maxSpeed = 0;
+    for (let i = 0; i < 300; i++) {
+      ball.applyForce(new CANNON.Vec3(
+        conveyorDir.x * force,
+        conveyorDir.y * force,
+        conveyorDir.z * force,
+      ));
+      applyMove(ball, keys, 0);
+      physics.step(CONFIG.physics.fixedTimeStep);
+      maxSpeed = Math.max(maxSpeed, horizontalSpeed(ball));
+    }
+
+    // Ball should not have been launched at extreme speed
+    expect(maxSpeed).toBeLessThan(CONFIG.ball.maxSpeed * 1.5);
+    // Ball should still be on the platform (not ejected upward or sideways)
+    expect(ball.position.y).toBeLessThan(3);
+    expect(Math.abs(ball.position.x)).toBeLessThan(5);
+  });
+
+  it("ball on sideways conveyor hitting side wall is not launched", () => {
+    // Side wall at x=3
+    const wallThickness = 1.5;
+    const wall = new CANNON.Body({
+      mass: 0,
+      shape: new CANNON.Box(new CANNON.Vec3(wallThickness / 2, 2 / 2, 15)),
+      material: physics.wallMaterial,
+    });
+    wall.position.set(3, 1, 0);
+    physics.addBody(wall);
+
+    // Conveyor pushes right into wall
+    const conveyorDir = new CANNON.Vec3(1, 0, 0);
+    const force = CONFIG.surfaces.speed.force;
+
+    let maxSpeed = 0;
+    for (let i = 0; i < 300; i++) {
+      ball.applyForce(new CANNON.Vec3(
+        conveyorDir.x * force,
+        conveyorDir.y * force,
+        conveyorDir.z * force,
+      ));
+      physics.step(CONFIG.physics.fixedTimeStep);
+      maxSpeed = Math.max(maxSpeed, horizontalSpeed(ball));
+    }
+
+    // Ball should not be violently ejected
+    expect(maxSpeed).toBeLessThan(CONFIG.ball.maxSpeed * 1.5);
+    expect(ball.position.y).toBeLessThan(3);
+  });
 });
 
 // ---------------------------------------------------------------------------
