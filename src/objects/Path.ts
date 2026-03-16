@@ -22,6 +22,41 @@ export interface PathSegmentDef {
   direction?: [number, number, number]; // for Speed surfaces
 }
 
+function createArrowTexture(): THREE.CanvasTexture {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Draw two chevron arrows pointing up (will be rotated to match direction)
+  ctx.strokeStyle = "#6688ff";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const yOff of [20, 72]) {
+    ctx.beginPath();
+    ctx.moveTo(28, yOff + 28);
+    ctx.lineTo(64, yOff);
+    ctx.lineTo(100, yOff + 28);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+let sharedArrowTexture: THREE.CanvasTexture | null = null;
+function getArrowTexture(): THREE.CanvasTexture {
+  if (!sharedArrowTexture) sharedArrowTexture = createArrowTexture();
+  return sharedArrowTexture;
+}
+
 export class PathSegment {
   mesh: THREE.Mesh;
   body: CANNON.Body;
@@ -37,6 +72,8 @@ export class PathSegment {
   private animTime = 0;
   private material: THREE.MeshStandardMaterial;
   private originalPosition: THREE.Vector3;
+  private arrowMesh: THREE.Mesh | null = null;
+  private arrowMaterial: THREE.MeshBasicMaterial | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -115,6 +152,47 @@ export class PathSegment {
     this.originalPosition = this.mesh.position.clone();
     scene.add(this.mesh);
 
+    // Add animated arrow overlay for speed surfaces
+    if (this.surfaceType === SurfaceType.Speed && this.speedDirection) {
+      const dir = this.speedDirection;
+      const angle = Math.atan2(dir.x, -dir.z);
+
+      // After rotation, the plane's local X/Y map to different world axes.
+      // Size the plane so it fits within the platform bounds after rotation.
+      const absC = Math.abs(Math.cos(angle));
+      const absS = Math.abs(Math.sin(angle));
+      // Solve for planeW, planeD such that rotated extents fit in w x d
+      const planeW = (absC > 0.01 && absS > 0.01)
+        ? Math.min(w / absC, d / absS)
+        : (absS < 0.01 ? w : d);
+      const planeD = (absC > 0.01 && absS > 0.01)
+        ? Math.min(d / absC, w / absS)
+        : (absS < 0.01 ? d : w);
+
+      const tex = getArrowTexture().clone();
+      tex.repeat.set(planeW / 2, planeD / 2);
+
+      this.arrowMaterial = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const arrowGeo = new THREE.PlaneGeometry(planeW, planeD);
+      this.arrowMesh = new THREE.Mesh(arrowGeo, this.arrowMaterial);
+      this.arrowMesh.rotation.x = -Math.PI / 2;
+      this.arrowMesh.position.set(px, py + h / 2 + 0.01, pz);
+
+      this.arrowMesh.rotation.z = -angle;
+
+      if (def.rotation) {
+        this.arrowMesh.rotation.z -= def.rotation;
+      }
+      scene.add(this.arrowMesh);
+    }
+
     // Determine physics material
     let physicsMat: CANNON.Material;
     switch (this.surfaceType) {
@@ -167,6 +245,12 @@ export class PathSegment {
       // Breathing glow
       const breath = 0.3 + Math.sin(this.animTime * 2) * 0.2;
       this.material.emissiveIntensity = breath;
+    }
+
+    if (this.surfaceType === SurfaceType.Speed && this.arrowMaterial?.map) {
+      // Scroll arrows in the conveyor direction
+      this.arrowMaterial.map.offset.y -= dt * 1.5;
+      this.arrowMaterial.opacity = 0.4 + Math.sin(this.animTime * 3) * 0.2;
     }
 
     if (this.surfaceType === SurfaceType.Crumbling && this.crumbleTimer >= 0 && !this.crumbled) {
