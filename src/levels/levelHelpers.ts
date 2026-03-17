@@ -150,6 +150,17 @@ export class TrackBuilder {
     return last.position as [number, number, number];
   }
 
+  /** Get the current heading (useful for orienting walls perpendicular to the track). */
+  lastHeading(): number {
+    return this.heading;
+  }
+
+  /** Get the top surface Y of the last straight segment (for placing objects on it). */
+  lastSurfaceY(): number {
+    const last = this.paths[this.paths.length - 1];
+    return last.position[1] + last.size[1] / 2;
+  }
+
   /** Build a finish zone pulled back onto the last platform. */
   finish(): { position: [number, number, number]; size: [number, number, number] } {
     // Pull center back 2 units along the track so the zone is fully on the platform

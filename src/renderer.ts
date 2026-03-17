@@ -159,7 +159,7 @@ export class Renderer {
     this.stars.rotation.x += dt * 0.0025;
 
     // Shooting stars
-    if (Math.random() < dt * 0.4) {
+    if (this.shootingStars.length < 5 && Math.random() < dt * 1.2) {
       this.spawnShootingStar();
     }
 

@@ -10,7 +10,6 @@ export enum SurfaceType {
   Bounce = "bounce",
   Speed = "speed",
   Crumbling = "crumbling",
-  Shrinking = "shrinking",
   Magnet = "magnet",
   Invisible = "invisible",
 }
@@ -72,13 +71,9 @@ export class PathSegment {
   speedDirection: THREE.Vector3 | null = null;
   crumbleTimer = -1;
   crumbled = false;
-  shrinkScale = 1;
-  shrinkActive = false;
   invisibleActive = true;
 
   private respawnTimer = -1;
-  private shrinkRestoreTimer = -1;
-  private shrinkBodyActive = true; // whether the shrink body is in the physics world
   private physicsMat: CANNON.Material | null = null;
   private invisibleTimer = 0;
   private invisibleOnTime = 2;
@@ -146,11 +141,6 @@ export class PathSegment {
         color = CONFIG.surfaces.crumbling.color;
         emissive = CONFIG.surfaces.crumbling.emissive;
         emissiveIntensity = 0;
-        break;
-      case SurfaceType.Shrinking:
-        color = CONFIG.surfaces.shrinking.color;
-        emissive = CONFIG.surfaces.shrinking.emissive;
-        emissiveIntensity = 0.4;
         break;
       case SurfaceType.Magnet:
         color = CONFIG.surfaces.magnet.color;
@@ -503,52 +493,6 @@ export class PathSegment {
       this.arrowMaterial.opacity = 0.4 + Math.sin(this.animTime * 3) * 0.2;
     }
 
-    if (this.surfaceType === SurfaceType.Shrinking) {
-      const glow = 0.3 + Math.sin(this.animTime * 2) * 0.15;
-      this.material.emissiveIntensity = glow;
-      const [w, h, d] = this.size;
-
-      if (this.shrinkActive) {
-        this.shrinkScale = Math.max(0.1, this.shrinkScale - CONFIG.surfaces.shrinking.shrinkRate * dt);
-      } else if (this.shrinkScale < 1) {
-        // Gradually regrow when ball is off
-        this.shrinkRestoreTimer -= dt;
-        if (this.shrinkRestoreTimer <= 0) {
-          this.shrinkScale = Math.min(1, this.shrinkScale + CONFIG.surfaces.shrinking.shrinkRate * 0.5 * dt);
-          if (!this.shrinkBodyActive) {
-            this.mesh.visible = true;
-            this.physics.addBody(this.body);
-            this.shrinkBodyActive = true;
-            for (const wall of this.walls) {
-              wall.mesh.visible = true;
-              this.physics.addBody(wall.body);
-            }
-          }
-        }
-      }
-
-      // Update visual and physics width
-      this.mesh.scale.set(this.shrinkScale, 1, 1);
-      const box = this.body.shapes[0] as CANNON.Box;
-      box.halfExtents.set(w * this.shrinkScale / 2, h / 2, d / 2);
-      box.updateConvexPolyhedronRepresentation();
-      box.updateBoundingSphereRadius();
-      this.body.updateBoundingRadius();
-
-      // Remove body entirely when too small
-      if (this.shrinkScale <= 0.1 && this.shrinkBodyActive) {
-        this.mesh.visible = false;
-        this.physics.removeBody(this.body);
-        this.shrinkBodyActive = false;
-        for (const wall of this.walls) {
-          wall.mesh.visible = false;
-          this.physics.removeBody(wall.body);
-        }
-        this.shrinkActive = false;
-        this.shrinkRestoreTimer = CONFIG.surfaces.shrinking.restoreDelay;
-      }
-    }
-
     if (this.surfaceType === SurfaceType.Magnet) {
       const pulse = 0.5 + Math.sin(this.animTime * 2) * 0.3;
       this.material.emissiveIntensity = pulse;
@@ -674,16 +618,6 @@ export class PathSegment {
         this.restore();
       }
     }
-  }
-
-  startShrink() {
-    if (this.surfaceType === SurfaceType.Shrinking && this.shrinkScale > 0.1) {
-      this.shrinkActive = true;
-    }
-  }
-
-  stopShrink() {
-    this.shrinkActive = false;
   }
 
   startCrumble() {

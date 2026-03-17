@@ -118,6 +118,7 @@ export class Ball {
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 16;
     return tex;
   }
 }

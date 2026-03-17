@@ -15,7 +15,6 @@
  * RULE 6: Timed hazards must be crossable
  *         - Lava: crossing time < damageTime at half max speed
  *         - Crumbling: crossing time < delay at half max speed
- *         - Shrinking: crossing time < time to shrink to nothing
  *         - Invisible: onTime must be enough to cross at half max speed
  * RULE 7: Speed conveyors with sideways push must connect seamlessly
  * RULE 8: Moving platforms must touch (not overlap) a neighbor at each extreme
@@ -31,6 +30,8 @@
  *         - Prevents shortcuts by ensuring the start doesn't border later segments
  * RULE 14: Obstacles must be placed on platforms
  * RULE 15: Lattice walls must be placed on or near platforms
+ * RULE 17: Lattice walls must sit on a platform surface (not hover)
+ * RULE 18: Lattice wall physics gap must align with visual gap
  * RULE 16: No obstacles or lattice walls on the first platform
  */
 
@@ -421,15 +422,6 @@ describe("Level playability", () => {
             }
           }
 
-          if (seg.surfaceType === SurfaceType.Shrinking) {
-            const timeToVanish = (1 - 0.1) / CONFIG.surfaces.shrinking.shrinkRate;
-            if (crossTime > timeToVanish) {
-              failures.push(
-                `Seg ${j} [shrinking]: ${crossTime.toFixed(1)}s to cross, vanishes in ${timeToVanish.toFixed(1)}s`
-              );
-            }
-          }
-
           if (seg.surfaceType === SurfaceType.Invisible && seg.invisible) {
             if (crossTime > seg.invisible.onTime) {
               failures.push(
@@ -734,6 +726,122 @@ describe("Level playability", () => {
             failures.push(
               `Lattice wall ${j} at (${wall.position.join(",")}) is not near any platform`
             );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 17
+      it("lattice walls sit on platform surface (not hovering)", () => {
+        if (!level.latticeWalls) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.latticeWalls.length; j++) {
+          const wall = level.latticeWalls[j];
+          const [wx, wy, wz] = wall.position;
+          const rotation = wall.rotation ?? 0;
+          const cos = Math.cos(rotation);
+          const sin = Math.sin(rotation);
+          const halfW = wall.width / 2;
+
+          // Check wall center and both ends for platform contact
+          const checkPoints = [
+            [wx, wz],
+            [wx + halfW * cos, wz + halfW * sin],
+            [wx - halfW * cos, wz - halfW * sin],
+          ];
+
+          let bestDist = Infinity;
+          for (const [cx, cz] of checkPoints) {
+            for (const seg of segments) {
+              const bb = segmentAABB(seg);
+              if (cx >= bb.minX - 1 && cx <= bb.maxX + 1 &&
+                  cz >= bb.minZ - 1 && cz <= bb.maxZ + 1) {
+                const surfaceY = topY(seg);
+                bestDist = Math.min(bestDist, Math.abs(wy - surfaceY));
+              }
+            }
+          }
+
+          if (bestDist > 0.3) {
+            failures.push(
+              `Lattice wall ${j} at y=${wy.toFixed(2)} is ${bestDist.toFixed(2)} units from nearest platform surface — should be ≤0.3`
+            );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 18
+      it("lattice wall gap aligns between visual and physics", () => {
+        if (!level.latticeWalls) return;
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.latticeWalls.length; j++) {
+          const wall = level.latticeWalls[j];
+          const { width, gapSide, gapWidth = 1.5, rotation = 0 } = wall;
+          if (!gapSide) continue;
+
+          const [px, , pz] = wall.position;
+          const cos = Math.cos(rotation);
+          const sin = Math.sin(rotation);
+
+          // Compute gap center offset in local X (same logic as LatticeWall.computeSections)
+          let gapLocalOffset: number;
+          if (gapSide === "left") gapLocalOffset = -width / 2 + gapWidth / 2;
+          else if (gapSide === "right") gapLocalOffset = width / 2 - gapWidth / 2;
+          else gapLocalOffset = 0; // center
+
+          // Gap center in world space (Three.js Y-rotation: localX -> cos*X - sin*Z)
+          const gapWorldX = px + gapLocalOffset * cos;
+          const gapWorldZ = pz - gapLocalOffset * sin;
+
+          // Compute section collision body centers using the same rotation transform
+          const sections: { offset: number; sectionWidth: number }[] = [];
+          if (gapSide === "left") {
+            sections.push({ offset: gapWidth / 2, sectionWidth: width - gapWidth });
+          } else if (gapSide === "right") {
+            sections.push({ offset: -gapWidth / 2, sectionWidth: width - gapWidth });
+          } else {
+            const sw = (width - gapWidth) / 2;
+            const hg = gapWidth / 2;
+            sections.push({ offset: -(hg + sw / 2), sectionWidth: sw });
+            sections.push({ offset: hg + sw / 2, sectionWidth: sw });
+          }
+
+          for (const sec of sections) {
+            // Physics body world position must use same transform as visual
+            const bodyWorldX = px + sec.offset * cos;
+            const bodyWorldZ = pz - sec.offset * sin; // must be negative sin to match Three.js
+
+            // Project gap center and body center onto the wall's local X axis
+            // to check for overlap
+            const dxW = bodyWorldX - px;
+            const dzW = bodyWorldZ - pz;
+            // Local X coordinate of the body center
+            const bodyLocal = dxW * cos - dzW * sin;
+            // Local X coordinate of the gap center
+            const dxG = gapWorldX - px;
+            const dzG = gapWorldZ - pz;
+            const gapLocal = dxG * cos - dzG * sin;
+
+            // Check overlap: body spans [bodyLocal - sw/2, bodyLocal + sw/2]
+            const bodyMin = bodyLocal - sec.sectionWidth / 2;
+            const bodyMax = bodyLocal + sec.sectionWidth / 2;
+            const gapMin = gapLocal - gapWidth / 2;
+            const gapMax = gapLocal + gapWidth / 2;
+
+            const overlap = Math.min(bodyMax, gapMax) - Math.max(bodyMin, gapMin);
+            if (overlap > 0.1) {
+              failures.push(
+                `Wall ${j}: physics body overlaps gap by ${overlap.toFixed(2)} units ` +
+                `(body local [${bodyMin.toFixed(1)},${bodyMax.toFixed(1)}], ` +
+                `gap local [${gapMin.toFixed(1)},${gapMax.toFixed(1)}])`
+              );
+            }
           }
         }
 

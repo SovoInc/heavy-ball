@@ -30,9 +30,6 @@ export class PowerUpManager {
       case PowerUpType.SpeedBoost:
         duration = cfg.speedBoostDuration;
         break;
-      case PowerUpType.Shrink:
-        duration = cfg.shrinkDuration;
-        break;
       case PowerUpType.Shield:
         duration = cfg.shieldDuration;
         break;
@@ -63,10 +60,7 @@ export class PowerUpManager {
   }
 
   getBallScale(): number {
-    const active = this.activePowerUps.find(
-      (p) => p.type === PowerUpType.Shrink,
-    );
-    return active ? CONFIG.powerUp.shrinkScale : 1;
+    return 1;
   }
 
   hasShield(): boolean {

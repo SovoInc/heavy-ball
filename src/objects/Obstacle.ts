@@ -21,7 +21,6 @@ export interface ObstacleDef {
 const POWER_UP_COLOR_MAP: Record<PowerUpType, number> = {
   [PowerUpType.TimeBonus]: CONFIG.powerUp.colors.timeBonus,
   [PowerUpType.SpeedBoost]: CONFIG.powerUp.colors.speedBoost,
-  [PowerUpType.Shrink]: CONFIG.powerUp.colors.shrink,
   [PowerUpType.Shield]: CONFIG.powerUp.colors.shield,
   [PowerUpType.TimeFreeze]: CONFIG.powerUp.colors.timeFreeze,
 };

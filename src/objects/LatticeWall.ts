@@ -62,7 +62,7 @@ export class LatticeWall {
       body.position.set(
         px + offset * cos,
         py + height / 2,
-        pz + offset * sin,
+        pz - offset * sin,
       );
       if (rotation) body.quaternion.setFromEuler(0, rotation, 0);
       physics.addBody(body);

@@ -5,7 +5,6 @@ import { api, type ScoreEntry } from "./api";
 const POWER_UP_NAMES: Record<PowerUpType, string> = {
   [PowerUpType.TimeBonus]: "Time Bonus",
   [PowerUpType.SpeedBoost]: "Speed Boost",
-  [PowerUpType.Shrink]: "Shrink",
   [PowerUpType.Shield]: "Shield",
   [PowerUpType.TimeFreeze]: "Time Freeze",
 };
@@ -13,7 +12,6 @@ const POWER_UP_NAMES: Record<PowerUpType, string> = {
 const POWER_UP_CSS_COLORS: Record<PowerUpType, string> = {
   [PowerUpType.TimeBonus]: "#44ddff",
   [PowerUpType.SpeedBoost]: "#ff8844",
-  [PowerUpType.Shrink]: "#bb44ff",
   [PowerUpType.Shield]: "#44ff88",
   [PowerUpType.TimeFreeze]: "#ffdd44",
 };
@@ -21,7 +19,6 @@ const POWER_UP_CSS_COLORS: Record<PowerUpType, string> = {
 const POWER_UP_DURATIONS: Record<PowerUpType, number> = {
   [PowerUpType.TimeBonus]: 0,
   [PowerUpType.SpeedBoost]: CONFIG.powerUp.speedBoostDuration,
-  [PowerUpType.Shrink]: CONFIG.powerUp.shrinkDuration,
   [PowerUpType.Shield]: CONFIG.powerUp.shieldDuration,
   [PowerUpType.TimeFreeze]: CONFIG.powerUp.timeFreezeDuration,
 };

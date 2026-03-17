@@ -91,13 +91,11 @@ class Game {
       if (type !== PowerUpType.TimeBonus) {
         const names: Record<string, string> = {
           [PowerUpType.SpeedBoost]: "Speed Boost!",
-          [PowerUpType.Shrink]: "Shrink!",
           [PowerUpType.Shield]: "Shield!",
           [PowerUpType.TimeFreeze]: "Time Freeze!",
         };
         const colors: Record<string, string> = {
           [PowerUpType.SpeedBoost]: "#ff8844",
-          [PowerUpType.Shrink]: "#bb44ff",
           [PowerUpType.Shield]: "#44ff88",
           [PowerUpType.TimeFreeze]: "#ffdd44",
         };
