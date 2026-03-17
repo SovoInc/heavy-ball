@@ -95,11 +95,6 @@ export class CurvedPathSegment {
         emissive = CONFIG.surfaces.crumbling.emissive;
         emissiveIntensity = 0;
         break;
-      case SurfaceType.Teleport:
-        color = CONFIG.surfaces.teleport.color;
-        emissive = CONFIG.surfaces.teleport.emissive;
-        emissiveIntensity = 0.6;
-        break;
       case SurfaceType.Shrinking:
         color = CONFIG.surfaces.shrinking.color;
         emissive = CONFIG.surfaces.shrinking.emissive;

@@ -1,5 +1,4 @@
 import type { LevelData } from "./Level";
-import { SurfaceType } from "../objects/Path";
 import { CONFIG } from "../config";
 
 const W = CONFIG.path.wideWidth;
@@ -13,22 +12,26 @@ const level: LevelData = {
     size: [W, 3, 4],
   },
   paths: [
-    // Start platform
-    { position: [0, 0, 0], size: [W, H, 8], noWalls: true },
-    // Teleport pad 1 — sends to second area
-    { position: [0, 0, -8], size: [3, H, 3], noWalls: true,
-      surfaceType: SurfaceType.Teleport, teleportTarget: [20, 0, 0] },
-    // Second area start (teleport destination)
+    // Island 1: x=0 (z=-2 to z=6)
+    { position: [0, 0, 2], size: [W, H, 8], noWalls: true },
+    // Portal approach (z=-2 to z=-10)
+    { position: [0, 0, -6], size: [W, H, 8], noWalls: true },
+    // Island 2: x=20 (z=-4 to z=4) — portal 1 destination
     { position: [20, 0, 0], size: [W, H, 8], noWalls: true },
-    // Path continues
-    { position: [20, 0, -10], size: [W, H, 12], noWalls: true },
-    // Teleport pad 2 — sends to third area
-    { position: [20, 0, -20], size: [3, H, 3], noWalls: true,
-      surfaceType: SurfaceType.Teleport, teleportTarget: [20, 0, -26] },
-    // Third area
-    { position: [20, 0, -26], size: [W, H, 6], noWalls: true },
-    // Finish
-    { position: [20, 0, -33], size: [W, H, 8], noWalls: true },
+    // Path continues (z=-4 to z=-12)
+    { position: [20, 0, -8], size: [W, H, 8], noWalls: true },
+    // More path (z=-12 to z=-20)
+    { position: [20, 0, -16], size: [W, H, 8], noWalls: true },
+    // Island 3: x=20 (z=-20 to z=-28) — portal 2 destination
+    { position: [20, 0, -24], size: [W, H, 8], noWalls: true },
+    // Finish (z=-28 to z=-34)
+    { position: [20, 0, -31], size: [W, H, 6], noWalls: true },
+  ],
+  teleportPairs: [
+    // Portal 1: end of island 1 → start of island 2 (20 units apart)
+    { a: [0, 0.25, -8], b: [20, 0.25, 2] },
+    // Portal 2: end of island 2 path → start of island 3 (8 units apart)
+    { a: [20, 0.25, -14], b: [20, 0.25, -22] },
   ],
 };
 

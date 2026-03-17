@@ -9,6 +9,7 @@ import { Obstacle, type ObstacleDef } from "../objects/Obstacle";
 import { FinishZone, StartMarker, type FinishZoneDef } from "../objects/FinishZone";
 import { WindZone, type WindZoneDef } from "../objects/WindZone";
 import { TimedGate, type TimedGateDef } from "../objects/TimedGate";
+import { TeleportPad, type TeleportPairDef } from "../objects/TeleportPad";
 import { Debris } from "../objects/Debris";
 import type { Ball } from "../objects/Ball";
 import type { PowerUpType } from "../powerups/PowerUpType";
@@ -26,6 +27,7 @@ export interface LevelData {
   windZones?: WindZoneDef[];
   timedGates?: TimedGateDef[];
   curvedPaths?: CurvedPathSegmentDef[];
+  teleportPairs?: TeleportPairDef[];
 }
 
 export class Level {
@@ -36,6 +38,7 @@ export class Level {
   obstacles: Obstacle[] = [];
   windZones: WindZone[] = [];
   timedGates: TimedGate[] = [];
+  teleportPads: TeleportPad[] = [];
   finishZone!: FinishZone;
   startMarker!: StartMarker;
   startPosition: [number, number, number];
@@ -58,7 +61,7 @@ export class Level {
   private lavaTimers = new Map<PathSegment | CurvedPathSegment, number>();
   private lavaHissPlayed = new Set<PathSegment | CurvedPathSegment>();
   private bounceCooldown = 0;
-  private teleportCooldown = 0;
+  private teleportLocked: TeleportPad | null = null; // pad the ball last arrived at
   private activeShrinkSegments = new Set<PathSegment>();
 
   constructor(
@@ -118,6 +121,12 @@ export class Level {
       }
     }
 
+    if (this.data.teleportPairs) {
+      for (const def of this.data.teleportPairs) {
+        this.teleportPads.push(new TeleportPad(this.scene, def));
+      }
+    }
+
     this.finishZone = new FinishZone(this.scene, this.data.finishZone);
     this.startMarker = new StartMarker(this.scene, this.data.startPosition);
 
@@ -172,6 +181,7 @@ export class Level {
     for (const p of this.pathSegments) {
       this.sceneObjects.push(p.mesh);
       for (const w of p.walls) this.sceneObjects.push(w.mesh);
+      for (const obj of p.extraSceneObjects) this.sceneObjects.push(obj);
     }
     for (const cp of this.curvedPathSegments) {
       this.sceneObjects.push(cp.mesh);
@@ -182,6 +192,9 @@ export class Level {
     for (const o of this.obstacles) this.sceneObjects.push(o.mesh);
     for (const wz of this.windZones) this.sceneObjects.push(wz.mesh);
     for (const tg of this.timedGates) this.sceneObjects.push(tg.mesh);
+    for (const tp of this.teleportPads) {
+      for (const obj of tp.sceneObjects) this.sceneObjects.push(obj);
+    }
     this.sceneObjects.push(this.finishZone.mesh);
     this.sceneObjects.push(this.startMarker.mesh);
   }
@@ -269,19 +282,6 @@ export class Level {
             if (seg.crumbleTimer < 0) {
               seg.startCrumble();
               playCrumble();
-            }
-            break;
-          }
-          case SurfaceType.Teleport: {
-            if (this.teleportCooldown <= 0 && seg.teleportTarget) {
-              this.ball!.body.position.set(
-                seg.teleportTarget.x,
-                seg.teleportTarget.y + ballR + 0.5,
-                seg.teleportTarget.z,
-              );
-              this.ball!.body.velocity.set(0, 0, 0);
-              this.teleportCooldown = 0.5;
-              playTeleport();
             }
             break;
           }
@@ -379,8 +379,32 @@ export class Level {
       }
     }
 
+    // Teleport pad checks — ball must leave the destination pad before it can teleport again
+    if (this.ball) {
+      const bp = this.ball.body.position;
+
+      // Clear lock once ball leaves the locked pad's radius
+      if (this.teleportLocked) {
+        const side = this.teleportLocked.checkBall(bp.x, bp.z);
+        if (!side) this.teleportLocked = null;
+      }
+
+      if (!this.teleportLocked) {
+        for (const pad of this.teleportPads) {
+          const side = pad.checkBall(bp.x, bp.z);
+          if (side) {
+            const dest = pad.getDestination(side);
+            this.ball.body.position.set(dest.x, dest.y + CONFIG.ball.radius + 0.5, dest.z);
+            this.ball.body.velocity.set(0, 0, 0);
+            this.teleportLocked = pad; // lock until ball leaves destination
+            playTeleport();
+            break;
+          }
+        }
+      }
+    }
+
     if (this.bounceCooldown > 0) this.bounceCooldown -= dt;
-    if (this.teleportCooldown > 0) this.teleportCooldown -= dt;
 
     // Update path segment animations
     for (const seg of this.pathSegments) {
@@ -388,6 +412,9 @@ export class Level {
     }
     for (const cseg of this.curvedPathSegments) {
       cseg.update(dt);
+    }
+    for (const tp of this.teleportPads) {
+      tp.update(dt);
     }
 
     for (const tg of this.timedGates) {
@@ -475,5 +502,6 @@ export class Level {
     this.obstacles = [];
     this.windZones = [];
     this.timedGates = [];
+    this.teleportPads = [];
   }
 }
