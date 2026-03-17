@@ -17,8 +17,8 @@ const level: LevelData = {
   finishZone: t.finish(),
   ...t.build(),
   obstacles: [
-    { position: [s2[0] + 1, 0.75, s2[2]], size: [1.5, 1, 1], breakable: true },
-    { position: [s3[0] - 1, 0.75, s3[2]], size: [1.5, 1, 1], breakable: true },
+    { position: [s2[0] + 1, 0.75, s2[2]], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s3[0] - 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true },
   ],
 };
 

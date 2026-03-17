@@ -220,8 +220,8 @@ class Game {
     // power_collector - 25 total
     if (this.totalPowerUpsCollected >= 25) unlocks.push("power_collector");
 
-    // completionist - all 20 levels
-    if (this.completedLevels.size >= 20) unlocks.push("completionist");
+    // completionist - all 100 levels
+    if (this.completedLevels.size >= 100) unlocks.push("completionist");
 
     // no_fall
     if (this.fallCount === 0) unlocks.push("no_fall");
