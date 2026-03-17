@@ -2,20 +2,31 @@ import type { LevelData } from "./Level";
 import { TrackBuilder } from "./levelHelpers";
 
 const t = new TrackBuilder();
+
+// === Section 1 ===
 t.straight(10);
 t.straight(10);
-const s2 = t.lastCenter();
-const y2 = t.lastSurfaceY();
-t.straight(14);
-const s3 = t.lastCenter();
+t.straight(10);
+const tpA = t.lastCenter();
+const yA = t.lastSurfaceY();
+
+// === Jump to new position (creates empty space) ===
+t.x += 30;
+t.z = 2;
+t.heading = 0;
+
+// === Section 2 ===
+t.straight(10);
+const tpB = t.lastCenter();
+const yB = t.lastSurfaceY();
 t.right(8);
 // After right turn, heading is π/2 (+X)
 t.straight(14);
-const s5 = t.lastCenter();
+const s2c = t.lastCenter();
+t.straight(14);
+const s2d = t.lastCenter();
 t.straight(10);
-const s6 = t.lastCenter();
-const y6 = t.lastSurfaceY();
-t.straight(10);
+const s2e = t.lastCenter();
 
 const level: LevelData = {
   name: "Level 24 — Warp Zone",
@@ -23,12 +34,12 @@ const level: LevelData = {
   finishZone: t.finish(),
   ...t.build(),
   obstacles: [
-    { position: [s3[0] + 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s5[0], 0.75, s5[2] - 1], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s5[0], 0.75, s5[2] + 1], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s2c[0], 0.75, s2c[2] - 1], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s2d[0], 0.75, s2d[2] + 1], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s2e[0], 0.75, s2e[2] - 1], size: [1.2, 1, 1.2], breakable: true },
   ],
   teleportPairs: [
-    { a: [s2[0], y2, s2[2]], b: [s6[0], y6, s6[2]] },
+    { a: [tpA[0], yA, tpA[2]], b: [tpB[0], yB, tpB[2]] },
   ],
 };
 

@@ -3,42 +3,53 @@ import { TrackBuilder, SurfaceType } from "./levelHelpers";
 import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
+
+// === Section 1 (~54 units) ===
 t.straight(10);
 t.straight(10, { surfaceType: SurfaceType.Ice });
-const s2 = t.lastCenter();
-const h2 = t.lastHeading();
-const y2 = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Lava });
-t.right(8);
-// After right turn, heading is π/2 (+X)
-t.straight(10, { surfaceType: SurfaceType.Crumbling });
-const s5 = t.lastCenter();
-const h5 = t.lastHeading();
-const y5 = t.lastSurfaceY();
-t.straight(8);
-const s6 = t.lastCenter();
-const y6 = t.lastSurfaceY();
+const s1b = t.lastCenter();
 t.left(8);
-// After left turn, heading is back to 0 (-Z)
-t.straight(8, { surfaceType: SurfaceType.Magnet });
-const s8 = t.lastCenter();
-const h8 = t.lastHeading();
-const y8 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
-t.right(6);
-// After right turn, heading is π/2 (+X)
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
-const s11 = t.lastCenter();
-const h11 = t.lastHeading();
-const y11 = t.lastSurfaceY();
-t.left(6);
-// After left turn, heading is back to 0 (-Z)
-t.straight(8, { surfaceType: SurfaceType.Lava });
+// After left turn, heading is -π/2 (-X)
+t.straight(10);
+const s1d = t.lastCenter();
+const h1d = t.lastHeading();
+const y1d = t.lastSurfaceY();
+t.straight(12, { surfaceType: SurfaceType.Lava });
+const s1e = t.lastCenter();
+t.right(8);
+// After right turn, heading is back to 0 (-Z)
+t.straight(10);
+const tpA = t.lastCenter();
+const yA = t.lastSurfaceY();
+
+// === Jump to new position (creates empty space) ===
+t.x += 30;
+t.z = 2;
+t.heading = 0;
+
+// === Section 2 (~54 units) ===
+t.straight(10);
+const tpB = t.lastCenter();
+const yB = t.lastSurfaceY();
+t.straight(10, { surfaceType: SurfaceType.Crumbling });
+const s2b = t.lastCenter();
+const h2b = t.lastHeading();
+const y2b = t.lastSurfaceY();
 t.left(6);
 // After left turn, heading is -π/2 (-X)
-t.straight(8);
-const s14 = t.lastCenter();
-const y14 = t.lastSurfaceY();
+t.straight(12, { surfaceType: SurfaceType.Magnet });
+const s2d = t.lastCenter();
+t.straight(10, { surfaceType: SurfaceType.Speed, direction: [-1, 0, 0] });
+t.right(8);
+// After right turn, heading is back to 0 (-Z)
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+const s2g = t.lastCenter();
+const h2g = t.lastHeading();
+const y2g = t.lastSurfaceY();
+t.straight(10);
+const s2h = t.lastCenter();
+const h2h = t.lastHeading();
+const y2h = t.lastSurfaceY();
 t.straight(10);
 
 const level: LevelData = {
@@ -47,28 +58,30 @@ const level: LevelData = {
   finishZone: t.finish(),
   ...t.build(),
   obstacles: [
-    { position: [s2[0] + 1, 0.75, s2[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
-    { position: [s5[0], 0.75, s5[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
-    { position: [s8[0] - 1, 0.75, s8[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
-    { position: [s11[0], 0.75, s11[2] + 1], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s14[0], 0.75, s14[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
+    // Section 1
+    { position: [s1b[0] + 1, 0.75, s1b[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
+    { position: [s1e[0], 0.75, s1e[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
+    // Section 2
+    { position: [s2d[0], 0.75, s2d[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
+    { position: [s2g[0] - 1, 0.75, s2g[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
+    { position: [s2h[0] + 1, 0.75, s2h[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
   ],
   latticeWalls: [
-    { position: [s2[0], y2, s2[2]], width: 6, height: 2, rotation: h2, gapSide: "right", gapWidth: 2.0 },
-    { position: [s5[0], y5, s5[2]], width: 6, height: 2, rotation: h5, gapSide: "left", gapWidth: 2.0 },
-    { position: [s8[0], y8, s8[2]], width: 6, height: 2, rotation: h8, gapSide: "center", gapWidth: 1.8 },
-    { position: [s11[0], y11, s11[2]], width: 6, height: 2, rotation: h11, gapSide: "right", gapWidth: 2.0 },
+    { position: [s1d[0], y1d, s1d[2]], width: 6, height: 2, rotation: h1d, gapSide: "right", gapWidth: 1.5 },
+    { position: [s2b[0], y2b, s2b[2]], width: 6, height: 2, rotation: h2b, gapSide: "left", gapWidth: 1.5 },
+    { position: [s2g[0], y2g, s2g[2]], width: 6, height: 2, rotation: h2g, gapSide: "center", gapWidth: 1.5 },
+    { position: [s2h[0], y2h, s2h[2]], width: 6, height: 2, rotation: h2h, gapSide: "right", gapWidth: 1.5 },
   ],
   windZones: [
     {
-      position: [s5[0], s5[1] + 1, s5[2]],
-      size: [6, 3, 10],
-      direction: [0, 0, -1],
+      position: [s2d[0], s2d[1] + 1, s2d[2]],
+      size: [6, 3, 12],
+      direction: [-1, 0, 0],
       strength: 10,
     },
   ],
   teleportPairs: [
-    { a: [s6[0], y6, s6[2]], b: [s14[0], y14, s14[2]] },
+    { a: [tpA[0], yA, tpA[2]], b: [tpB[0], yB, tpB[2]] },
   ],
 };
 

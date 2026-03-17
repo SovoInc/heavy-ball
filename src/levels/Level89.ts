@@ -3,33 +3,48 @@ import { TrackBuilder, SurfaceType } from "./levelHelpers";
 import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
+
+// === Section 1 (~66 units): Ice, Lava, 1 wall, 1 box ===
 t.straight(10);                                                               // safe start
 t.straight(12, { surfaceType: SurfaceType.Ice });
-const s2 = t.lastCenter(); const y2 = t.lastSurfaceY();
 t.straight(10);
-const s3 = t.lastCenter(); const h3 = t.lastHeading(); const y3 = t.lastSurfaceY();
+const w1 = t.lastCenter(); const hw1 = t.lastHeading(); const yw1 = t.lastSurfaceY();
+const s1_box = t.lastCenter();
 t.right(8);                                                                   // curve 1 → heading π/2
 t.straight(14);
-const s5 = t.lastCenter(); const y5 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Lava });
-const s6 = t.lastCenter();
-t.left(8);                                                                    // curve 2 → heading 0
-t.straight(12);
-const s8 = t.lastCenter(); const h8 = t.lastHeading(); const y8 = t.lastSurfaceY();
-t.left(6);                                                                    // curve 3 → heading -π/2
-t.straight(14, { surfaceType: SurfaceType.Speed, direction: [-1, 0, 0] });
-const s10 = t.lastCenter();
-t.straight(10);
-const s11 = t.lastCenter(); const y11 = t.lastSurfaceY();
-t.right(8);                                                                   // curve 4 → heading 0
-t.straight(12, { surfaceType: SurfaceType.Magnet });
-const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
-t.right(8);                                                                   // curve 5 → heading π/2
-t.straight(14);
-const s15 = t.lastCenter(); const y15 = t.lastSurfaceY();
-t.straight(10);
+t.straight(10);                                                               // telepad 1A here
+const tp1A = t.lastCenter(); const y1A = t.lastSurfaceY();
 
-// ~10+12+10+12.6+14+10+12.6+12+9.4+14+10+12.6+12+12.6+14+10 = ~197.8
+// === Jump to section 2 ===
+t.x += 30; t.z = 2; t.y = 0; t.heading = 0;
+
+// === Section 2 (~66 units): Speed, 1 wall, 1 box ===
+t.straight(10);                                                               // telepad 1B here
+const tp1B = t.lastCenter(); const y1B = t.lastSurfaceY();
+t.left(8);                                                                    // curve 2 → heading -π/2
+t.straight(12);
+const w2 = t.lastCenter(); const hw2 = t.lastHeading(); const yw2 = t.lastSurfaceY();
+const s2_box = t.lastCenter();
+t.left(6);                                                                    // curve 3 → heading π (reverse)
+t.straight(14, { surfaceType: SurfaceType.Speed, direction: [0, 0, 1] });
+t.straight(10);
+t.straight(10);                                                               // telepad 2A here
+const tp2A = t.lastCenter(); const y2A = t.lastSurfaceY();
+
+// === Jump to section 3 ===
+t.x += 30; t.z = 2; t.y = 0; t.heading = 0;
+
+// === Section 3 (~66 units): Magnet, 1 wall, 1 box ===
+t.straight(10);                                                               // telepad 2B here
+const tp2B = t.lastCenter(); const y2B = t.lastSurfaceY();
+t.right(8);                                                                   // curve 4 → heading π/2
+t.straight(12, { surfaceType: SurfaceType.Magnet });
+const w3 = t.lastCenter(); const hw3 = t.lastHeading(); const yw3 = t.lastSurfaceY();
+const s3_box = t.lastCenter();
+t.right(8);                                                                   // curve 5 → heading π
+t.straight(14);
+t.straight(10);                                                               // finish
 
 const level: LevelData = {
   name: "Level 89 — Warp Zone",
@@ -37,18 +52,18 @@ const level: LevelData = {
   finishZone: t.finish(),
   ...t.build(),
   obstacles: [
-    { position: [s3[0] + 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
-    { position: [s6[0], 0.75, s6[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
-    { position: [s10[0], 0.75, s10[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
+    { position: [s1_box[0] + 1, 0.75, s1_box[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
+    { position: [s2_box[0], 0.75, s2_box[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
+    { position: [s3_box[0], 0.75, s3_box[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
   ],
   latticeWalls: [
-    { position: [s3[0], y3, s3[2]], width: 6, height: 2, rotation: h3, gapSide: "right", gapWidth: 1.5 },
-    { position: [s8[0], y8, s8[2]], width: 6, height: 2, rotation: h8, gapSide: "left", gapWidth: 1.5 },
-    { position: [s13[0], y13, s13[2]], width: 6, height: 2, rotation: h13, gapSide: "center", gapWidth: 1.8 },
+    { position: [w1[0], yw1, w1[2]], width: 6, height: 2, rotation: hw1, gapSide: "right", gapWidth: 1.5 },
+    { position: [w2[0], yw2, w2[2]], width: 6, height: 2, rotation: hw2, gapSide: "left", gapWidth: 1.5 },
+    { position: [w3[0], yw3, w3[2]], width: 6, height: 2, rotation: hw3, gapSide: "center", gapWidth: 1.8 },
   ],
   teleportPairs: [
-    { a: [s2[0], y2, s2[2]], b: [s5[0], y5, s5[2]] },
-    { a: [s11[0], y11, s11[2]], b: [s15[0], y15, s15[2]] },
+    { a: [tp1A[0], y1A, tp1A[2]], b: [tp1B[0], y1B, tp1B[2]] },
+    { a: [tp2A[0], y2A, tp2A[2]], b: [tp2B[0], y2B, tp2B[2]] },
   ],
 };
 

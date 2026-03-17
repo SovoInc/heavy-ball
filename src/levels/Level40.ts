@@ -3,39 +3,54 @@ import { TrackBuilder, SurfaceType } from "./levelHelpers";
 import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
+
+// === Section 1 ===
 t.straight(10);
 t.straight(8, { surfaceType: SurfaceType.Ice });
+const s1b = t.lastCenter();
 t.left(6);
 // After left turn, heading is -π/2 (-X)
 t.straight(10);
-const s4 = t.lastCenter();
-const h4 = t.lastHeading();
-const y4 = t.lastSurfaceY();
+const s1d = t.lastCenter();
+const h1d = t.lastHeading();
+const y1d = t.lastSurfaceY();
 t.straight(8, { surfaceType: SurfaceType.Lava });
 t.right(6);
 // After right turn, heading is back to 0 (-Z)
 t.straight(6, { surfaceType: SurfaceType.Bounce });
 t.drop(-6);
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
-const s9 = t.lastCenter();
+const s1h = t.lastCenter();
+t.straight(10);
+const tpA = t.lastCenter();
+const yA = t.lastSurfaceY();
+
+// === Jump to new position (creates empty space) ===
+t.x = 100;
+t.z = 200;
+t.y = 0;
+t.heading = 0;
+
+// === Section 2 ===
+t.straight(10);
+const tpB = t.lastCenter();
+const yB = t.lastSurfaceY();
 t.straight(8, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
+const s2b = t.lastCenter();
 t.left(6);
 // After left turn, heading is -π/2 (-X)
 t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
-const s12 = t.lastCenter();
+const s2d = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });
-const s13 = t.lastCenter();
+const s2e = t.lastCenter();
 t.right(6);
 // After right turn, heading is back to 0 (-Z)
 t.straight(10);
-const s15 = t.lastCenter();
+const s2g = t.lastCenter();
+const h2g = t.lastHeading();
+const y2g = t.lastSurfaceY();
 t.straight(10);
-const s16 = t.lastCenter();
-const y16 = t.lastSurfaceY();
-t.straight(10);
-const s17 = t.lastCenter();
-const y17 = t.lastSurfaceY();
-t.straight(10);
+const s2h = t.lastCenter();
 
 const level: LevelData = {
   name: "Level 40 — Chapter's End",
@@ -43,28 +58,30 @@ const level: LevelData = {
   finishZone: t.finish(),
   ...t.build(),
   obstacles: [
-    { position: [s9[0] + 1, s9[1] + 0.5, s9[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
-    { position: [s13[0], 0.75, s13[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
-    { position: [s15[0] - 1, s15[1] + 0.5, s15[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
-    { position: [s16[0] + 1, s16[1] + 0.5, s16[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
-    { position: [s17[0] - 1, s17[1] + 0.5, s17[2]], size: [1.2, 1, 1.2], breakable: true },
+    // Section 1: 2 boxes
+    { position: [s1b[0], 0.75, s1b[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
+    { position: [s1h[0] + 1, s1h[1] + 0.5, s1h[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
+    // Section 2: 3 boxes
+    { position: [s2b[0], 0.75, s2b[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
+    { position: [s2e[0], 0.75, s2e[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
+    { position: [s2h[0] - 1, 0.75, s2h[2]], size: [1.2, 1, 1.2], breakable: true },
   ],
   latticeWalls: [
-    { position: [s4[0], y4, s4[2]], width: 6, height: 2, rotation: h4, gapSide: "center", gapWidth: 2.0 },
+    { position: [s1d[0], y1d, s1d[2]], width: 6, height: 2, rotation: h1d, gapSide: "center", gapWidth: 2.0 },
   ],
   timedGates: [
-    { position: [s15[0], 1.5 + s15[1], s15[2]], size: [6, 2.5, 0.5], onTime: 2.5, offTime: 2 },
+    { position: [s2g[0], 1.5, s2g[2]], size: [6, 2.5, 0.5], onTime: 2.5, offTime: 2 },
   ],
   windZones: [
     {
-      position: [s12[0], s12[1] + 1, s12[2]],
+      position: [s2d[0], s2d[1] + 1, s2d[2]],
       size: [16, 3, 6],
       direction: [0, 0, -1],
       strength: 10,
     },
   ],
   teleportPairs: [
-    { a: [s16[0], y16, s16[2]], b: [s17[0], y17, s17[2]] },
+    { a: [tpA[0], yA, tpA[2]], b: [tpB[0], yB, tpB[2]] },
   ],
 };
 
