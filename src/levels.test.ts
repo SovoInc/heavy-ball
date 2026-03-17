@@ -27,6 +27,11 @@
  * RULE 10: Teleport pads must be placed on platforms
  * RULE 11: Teleport pad pairs must be far apart (distance > 4× pad radius)
  * RULE 12: Platform widths within a level must not vary wildly (max ≤ 4× min)
+ * RULE 13: Start platform can only touch the next track element
+ *         - Prevents shortcuts by ensuring the start doesn't border later segments
+ * RULE 14: Obstacles must be placed on platforms
+ * RULE 15: Lattice walls must be placed on or near platforms
+ * RULE 16: No obstacles or lattice walls on the first platform
  */
 
 import { describe, it, expect } from "vitest";
@@ -631,6 +636,132 @@ describe("Level playability", () => {
             failures.push(
               `Pair ${p}: pads are ${dist.toFixed(1)} apart, need ≥${minDist.toFixed(1)} (4× radius ${r})`
             );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 13
+      it("start platform only touches the next track element", () => {
+        const segments = getWalkableSegments(level);
+        const startBox = segmentAABB(segments[0]);
+
+        // Map each walkable segment index to its logical source.
+        // paths[0..N-1], then bridges, then curvedPaths[0] AABBs, curvedPaths[1] AABBs, …
+        const pathCount = level.paths.length;
+        const bridgeCount = level.bridges?.length ?? 0;
+        const nonCurveCount = pathCount + bridgeCount;
+
+        // Pre-compute curved-path index ranges
+        const curveRanges: { start: number; end: number; idx: number }[] = [];
+        let offset = nonCurveCount;
+        if (level.curvedPaths) {
+          for (let c = 0; c < level.curvedPaths.length; c++) {
+            const count = curvedSegmentToAABBs(level.curvedPaths[c]).length;
+            curveRanges.push({ start: offset, end: offset + count, idx: c });
+            offset += count;
+          }
+        }
+
+        function sourceOf(j: number): string {
+          if (j < pathCount) return `path:${j}`;
+          if (j < nonCurveCount) return `bridge:${j - pathCount}`;
+          for (const r of curveRanges) {
+            if (j >= r.start && j < r.end) return `curve:${r.idx}`;
+          }
+          return `unknown:${j}`;
+        }
+
+        const touchingSources = new Set<string>();
+        for (let j = 1; j < segments.length; j++) {
+          const box = segmentAABB(segments[j]);
+          const gap = horizontalGap(startBox, box);
+          const heightDiff = Math.abs(topY(segments[0]) - topY(segments[j]));
+          const hasBounce = segments[0].surfaceType === SurfaceType.Bounce ||
+                            segments[j].surfaceType === SurfaceType.Bounce;
+          const maxHeight = hasBounce ? MAX_BOUNCE_HEIGHT : BALL_RADIUS + 0.5;
+          if (gap <= TOUCH_TOLERANCE && heightDiff <= maxHeight) {
+            touchingSources.add(sourceOf(j));
+          }
+        }
+
+        expect(
+          touchingSources.size,
+          `Start platform touches ${touchingSources.size} elements: ${[...touchingSources].join(", ")} — should only touch one`
+        ).toBeLessThanOrEqual(1);
+      });
+
+      // RULE 14
+      it("obstacles are placed on platforms", () => {
+        if (!level.obstacles) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.obstacles.length; j++) {
+          const obs = level.obstacles[j];
+          const [ox, , oz] = obs.position;
+          const onPlatform = segments.some(seg => {
+            const bb = segmentAABB(seg);
+            return ox >= bb.minX - 0.5 && ox <= bb.maxX + 0.5 &&
+                   oz >= bb.minZ - 0.5 && oz <= bb.maxZ + 0.5;
+          });
+          if (!onPlatform) {
+            failures.push(
+              `Obstacle ${j} at (${obs.position.join(",")}) is not on any platform`
+            );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 15
+      it("lattice walls are placed on or near platforms", () => {
+        if (!level.latticeWalls) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.latticeWalls.length; j++) {
+          const wall = level.latticeWalls[j];
+          const [wx, , wz] = wall.position;
+          const nearPlatform = segments.some(seg => {
+            const bb = segmentAABB(seg);
+            return wx >= bb.minX - 1 && wx <= bb.maxX + 1 &&
+                   wz >= bb.minZ - 1 && wz <= bb.maxZ + 1;
+          });
+          if (!nearPlatform) {
+            failures.push(
+              `Lattice wall ${j} at (${wall.position.join(",")}) is not near any platform`
+            );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 16
+      it("no obstacles or walls on the first platform", () => {
+        const firstBox = segmentAABB(level.paths[0]);
+        const failures: string[] = [];
+
+        if (level.obstacles) {
+          for (let j = 0; j < level.obstacles.length; j++) {
+            const [ox, , oz] = level.obstacles[j].position;
+            if (ox >= firstBox.minX - 0.5 && ox <= firstBox.maxX + 0.5 &&
+                oz >= firstBox.minZ - 0.5 && oz <= firstBox.maxZ + 0.5) {
+              failures.push(`Obstacle ${j} at (${level.obstacles[j].position.join(",")}) is on the start platform`);
+            }
+          }
+        }
+
+        if (level.latticeWalls) {
+          for (let j = 0; j < level.latticeWalls.length; j++) {
+            const [wx, , wz] = level.latticeWalls[j].position;
+            if (wx >= firstBox.minX - 1 && wx <= firstBox.maxX + 1 &&
+                wz >= firstBox.minZ - 1 && wz <= firstBox.maxZ + 1) {
+              failures.push(`Lattice wall ${j} at (${level.latticeWalls[j].position.join(",")}) is on the start platform`);
+            }
           }
         }
 
