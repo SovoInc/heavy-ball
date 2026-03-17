@@ -31,23 +31,29 @@ jobs:
           mkdir -p server/static
           cp -r dist/* server/static/
 
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.HOMEBASE_SSH_KEY }}
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.HOMEBASE_SSH_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.HOMEBASE_SSH_PASSPHRASE }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          eval "$(ssh-agent -s)"
+          echo "$SSH_PASSPHRASE" | SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/bin/cat ssh-add ~/.ssh/deploy_key
+          ssh-keyscan -H 159.203.121.3 >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy to homebase
         run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no"
-
           # Create deploy directory
-          ssh $SSH_OPTS root@159.203.121.3 "mkdir -p /opt/heavy-ball/static"
+          ssh root@159.203.121.3 "mkdir -p /opt/heavy-ball/static"
 
           # Upload binary and static files
-          scp $SSH_OPTS server/target/release/heavy-ball-server root@159.203.121.3:/opt/heavy-ball/heavy-ball-server.new
-          rsync -az --delete -e "ssh $SSH_OPTS" server/static/ root@159.203.121.3:/opt/heavy-ball/static/
+          scp server/target/release/heavy-ball-server root@159.203.121.3:/opt/heavy-ball/heavy-ball-server.new
+          rsync -az --delete server/static/ root@159.203.121.3:/opt/heavy-ball/static/
 
           # Swap binary and restart
-          ssh $SSH_OPTS root@159.203.121.3 "
+          ssh root@159.203.121.3 "
             mv /opt/heavy-ball/heavy-ball-server.new /opt/heavy-ball/heavy-ball-server
             chmod +x /opt/heavy-ball/heavy-ball-server
             systemctl restart heavy-ball
