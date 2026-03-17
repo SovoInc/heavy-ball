@@ -1,0 +1,55 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - run: cargo build --release
+        working-directory: server
+
+      - name: Copy frontend to server static
+        run: |
+          rm -rf server/static
+          mkdir -p server/static
+          cp -r dist/* server/static/
+
+      - name: Deploy to homebase
+        env:
+          SSH_KEY: ${{ secrets.HOMEBASE_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          SSH_OPTS="-o StrictHostKeyChecking=no -i ~/.ssh/deploy_key"
+
+          # Create deploy directory
+          ssh $SSH_OPTS root@159.203.121.3 "mkdir -p /opt/heavy-ball/static"
+
+          # Upload binary and static files
+          scp $SSH_OPTS server/target/release/heavy-ball-server root@159.203.121.3:/opt/heavy-ball/heavy-ball-server.new
+          rsync -az --delete -e "ssh $SSH_OPTS" server/static/ root@159.203.121.3:/opt/heavy-ball/static/
+
+          # Swap binary and restart
+          ssh $SSH_OPTS root@159.203.121.3 "
+            mv /opt/heavy-ball/heavy-ball-server.new /opt/heavy-ball/heavy-ball-server
+            chmod +x /opt/heavy-ball/heavy-ball-server
+            systemctl restart heavy-ball
+          "
