@@ -94,7 +94,7 @@ const level: LevelData = {
     { position: [0, 3, -101], size: [W, H, 4], noWalls: true, surfaceType: SurfaceType.Bounce },
 
     // Ground bounce pad 2
-    { position: [0, 0, -106], size: [W, H, 4], noWalls: true, surfaceType: SurfaceType.Bounce },
+    { position: [0, 0, -105], size: [W, H, 4], noWalls: true, surfaceType: SurfaceType.Bounce },
 
     // Elevated platform 2
     { position: [0, 3, -111], size: [W, H, 4], noWalls: true, surfaceType: SurfaceType.Bounce },
@@ -137,7 +137,7 @@ const level: LevelData = {
     // Speed conveyor pushing forward (fast ride)
     {
       position: [6, 0, -153],
-      size: [N, H, 8],
+      size: [3, H, 8],
       noWalls: true,
       surfaceType: SurfaceType.Speed,
       direction: [0, 0, -1],
