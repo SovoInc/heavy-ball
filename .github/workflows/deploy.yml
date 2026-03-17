@@ -40,8 +40,12 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           eval "$(ssh-agent -s)"
-          echo "$SSH_PASSPHRASE" | SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/bin/cat ssh-add ~/.ssh/deploy_key
+          echo "echo \$SSH_PASSPHRASE" > /tmp/askpass.sh
+          chmod +x /tmp/askpass.sh
+          DISPLAY=:0 SSH_ASKPASS=/tmp/askpass.sh SSH_ASKPASS_REQUIRE=force ssh-add ~/.ssh/deploy_key
+          rm /tmp/askpass.sh
           ssh-keyscan -H 159.203.121.3 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
 
       - name: Deploy to homebase
         run: |
