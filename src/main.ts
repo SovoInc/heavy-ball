@@ -271,7 +271,7 @@ class Game {
       }
 
       this.ball.syncMesh(dt);
-      this.levelManager.update(dt);
+      this.levelManager.update(dt, this.powerUpManager.hasShield());
       this.powerUpManager.update(dt);
 
       // Check for surface-triggered reset (lava)

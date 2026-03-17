@@ -62,8 +62,6 @@ export class Level {
   private lavaHissPlayed = new Set<PathSegment | CurvedPathSegment>();
   private bounceCooldown = 0;
   private teleportLocked: TeleportPad | null = null; // pad the ball last arrived at
-  private activeShrinkSegments = new Set<PathSegment>();
-
   constructor(
     scene: THREE.Scene,
     physics: Physics,
@@ -199,7 +197,7 @@ export class Level {
     this.sceneObjects.push(this.startMarker.mesh);
   }
 
-  update(dt: number) {
+  update(dt: number, shielded = false) {
     for (const o of this.obstacles) {
       if (!o.destroyed) o.update(dt);
     }
@@ -218,9 +216,8 @@ export class Level {
       const ballPos = this.ball.body.position;
       const ballR = CONFIG.ball.radius;
 
-      // Track which lava/shrink segments ball is currently on
+      // Track which lava segments ball is currently on
       const activeLavaSegments = new Set<PathSegment | CurvedPathSegment>();
-      const activeShrinkSegments = new Set<PathSegment>();
 
       for (const seg of this.pathSegments) {
         if (seg.crumbled) continue;
@@ -244,15 +241,19 @@ export class Level {
         switch (seg.surfaceType) {
           case SurfaceType.Lava: {
             activeLavaSegments.add(seg);
-            const timer = (this.lavaTimers.get(seg) ?? 0) + dt;
-            this.lavaTimers.set(seg, timer);
+            if (shielded) {
+              this.lavaTimers.set(seg, 0);
+            } else {
+              const timer = (this.lavaTimers.get(seg) ?? 0) + dt;
+              this.lavaTimers.set(seg, timer);
+              if (timer >= CONFIG.surfaces.lava.damageTime) {
+                this.pendingReset = true;
+                this.pendingShake = 0.3;
+              }
+            }
             if (!this.lavaHissPlayed.has(seg)) {
               this.lavaHissPlayed.add(seg);
               playLavaHiss();
-            }
-            if (timer >= CONFIG.surfaces.lava.damageTime) {
-              this.pendingReset = true;
-              this.pendingShake = 0.3;
             }
             break;
           }
@@ -285,11 +286,6 @@ export class Level {
             }
             break;
           }
-          case SurfaceType.Shrinking: {
-            activeShrinkSegments.add(seg);
-            seg.startShrink();
-            break;
-          }
           case SurfaceType.Magnet: {
             const dx = mp.x - ballPos.x;
             const dz = mp.z - ballPos.z;
@@ -303,17 +299,6 @@ export class Level {
             break;
           }
         }
-      }
-
-      // Stop shrinking on segments the ball left
-      for (const seg of this.activeShrinkSegments) {
-        if (!activeShrinkSegments.has(seg)) {
-          seg.stopShrink();
-          this.activeShrinkSegments.delete(seg);
-        }
-      }
-      for (const seg of activeShrinkSegments) {
-        this.activeShrinkSegments.add(seg);
       }
 
       // Curved path surface interactions
@@ -331,15 +316,19 @@ export class Level {
         switch (cseg.surfaceType) {
           case SurfaceType.Lava: {
             activeLavaSegments.add(cseg);
-            const timer = (this.lavaTimers.get(cseg) ?? 0) + dt;
-            this.lavaTimers.set(cseg, timer);
+            if (shielded) {
+              this.lavaTimers.set(cseg, 0);
+            } else {
+              const timer = (this.lavaTimers.get(cseg) ?? 0) + dt;
+              this.lavaTimers.set(cseg, timer);
+              if (timer >= CONFIG.surfaces.lava.damageTime) {
+                this.pendingReset = true;
+                this.pendingShake = 0.3;
+              }
+            }
             if (!this.lavaHissPlayed.has(cseg)) {
               this.lavaHissPlayed.add(cseg);
               playLavaHiss();
-            }
-            if (timer >= CONFIG.surfaces.lava.damageTime) {
-              this.pendingReset = true;
-              this.pendingShake = 0.3;
             }
             break;
           }
