@@ -118,6 +118,48 @@ impl Db {
         Ok("ok".to_string())
     }
 
+    pub fn global_leaderboard(&self, limit: i64) -> Result<Vec<(String, i64, i64, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT p.alias, p.id, sub.max_level, sub.total_time
+             FROM (
+               SELECT player_id, MAX(level) as max_level,
+                      SUM(best_time) as total_time
+               FROM (
+                 SELECT player_id, level, MIN(time_ms) as best_time
+                 FROM scores
+                 GROUP BY player_id, level
+               )
+               GROUP BY player_id
+             ) sub
+             JOIN players p ON sub.player_id = p.id
+             ORDER BY sub.max_level DESC, sub.total_time ASC
+             LIMIT ?1"
+        )?;
+        let rows = stmt.query_map(params![limit], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?.collect::<Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn player_progress(&self, player_id: i64) -> Result<(i64, i64)> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT COALESCE(MAX(level), 0) as max_level,
+                    COALESCE(SUM(best_time), 0) as total_time
+             FROM (
+               SELECT level, MIN(time_ms) as best_time
+               FROM scores
+               WHERE player_id = ?1
+               GROUP BY level
+             )"
+        )?;
+        let row = stmt.query_row(params![player_id], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
+        Ok(row)
+    }
+
     pub fn player_achievements(&self, player_id: i64) -> Result<Vec<(String, String)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

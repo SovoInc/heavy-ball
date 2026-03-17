@@ -53,3 +53,23 @@ pub struct LevelQuery {
     pub level: Option<i64>,
     pub limit: Option<i64>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct LeaderboardQuery {
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LeaderboardEntry {
+    pub rank: i64,
+    pub alias: String,
+    pub player_id: i64,
+    pub max_level: i64,
+    pub total_time_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PlayerProgress {
+    pub max_level: i64,
+    pub total_time_ms: i64,
+}
