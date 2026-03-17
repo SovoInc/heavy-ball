@@ -3,3 +3,7 @@ dist
 *.local
 .DS_Store
 server/target/
+server/*.db
+server/*.db-shm
+server/*.db-wal
+server/static/
