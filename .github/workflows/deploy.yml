@@ -31,14 +31,13 @@ jobs:
           mkdir -p server/static
           cp -r dist/* server/static/
 
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOMEBASE_SSH_KEY }}
+
       - name: Deploy to homebase
-        env:
-          SSH_KEY: ${{ secrets.HOMEBASE_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" | install -m 600 /dev/stdin ~/.ssh/deploy_key
-          SSH_OPTS="-o StrictHostKeyChecking=no -i ~/.ssh/deploy_key"
-          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1 || { echo "Invalid SSH key"; exit 1; }
+          SSH_OPTS="-o StrictHostKeyChecking=no"
 
           # Create deploy directory
           ssh $SSH_OPTS root@159.203.121.3 "mkdir -p /opt/heavy-ball/static"
