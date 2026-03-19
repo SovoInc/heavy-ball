@@ -55,16 +55,18 @@ class Game {
     this.setupHUDCallbacks();
     this.setupLevelSelectKey();
 
-    // Check for existing player
+    // Check for existing player — wallet required
     this.player = getPlayer();
-    if (this.player) {
-      // Restore auth token if available
+    if (this.player && this.player.wallet_address) {
       if (this.player.auth_token) {
         setAuthToken(this.player.auth_token);
       }
       this.showStartWithProgress();
     } else {
-      this.hud.showAliasEntry(hasMidnightWallet());
+      // No wallet session — show connect screen
+      clearPlayer();
+      this.player = null;
+      this.hud.showWalletLogin();
     }
   }
 
@@ -132,23 +134,6 @@ class Game {
   }
 
   private setupHUDCallbacks() {
-    this.hud.onAliasSubmit = async (alias: string) => {
-      try {
-        const data = await api.registerAlias(alias);
-        this.player = { id: data.id, alias: data.alias };
-        if (data.auth_token) {
-          this.player.auth_token = data.auth_token;
-          setAuthToken(data.auth_token);
-        }
-        setPlayer(this.player);
-      } catch {
-        // If server is down, play offline
-        this.player = { id: 0, alias };
-        setPlayer(this.player);
-      }
-      await this.showStartWithProgress();
-    };
-
     this.hud.onWalletConnect = async () => {
       this.hud.showWalletConnecting();
       try {
@@ -179,7 +164,7 @@ class Game {
       this.totalPowerUpsCollected = 0;
       this.totalSpeedBoosts = 0;
       this.completedLevels.clear();
-      this.hud.showAliasEntry(hasMidnightWallet());
+      this.hud.showWalletLogin();
     };
 
     this.hud.onStart = () => {
