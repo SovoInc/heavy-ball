@@ -14,7 +14,8 @@ t.straight(10);
 const s1d = t.lastCenter();
 const h1d = t.lastHeading();
 const y1d = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Lava });
+t.straight(7, { surfaceType: SurfaceType.Lava });
+const s1e = t.lastCenter();
 t.right(6);
 // After right turn, heading is back to 0 (-Z)
 t.straight(6, { surfaceType: SurfaceType.Bounce });
@@ -51,6 +52,8 @@ const h2g = t.lastHeading();
 const y2g = t.lastSurfaceY();
 t.straight(10);
 const s2h = t.lastCenter();
+t.straight(7, { surfaceType: SurfaceType.Lava });
+t.straight(10);
 
 const level: LevelData = {
   name: "Level 40 — Chapter's End",
@@ -78,6 +81,12 @@ const level: LevelData = {
       size: [16, 3, 6],
       direction: [0, 0, -1],
       strength: 10,
+    },
+    {
+      position: [s1e[0], s1e[1] + 1, s1e[2]],
+      size: [7, 3, 6],
+      direction: [0, 0, 1],
+      strength: 8,
     },
   ],
   teleportPairs: [

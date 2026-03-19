@@ -7,9 +7,10 @@ t.straight(10);
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
 t.straight(6);
 const s3 = t.lastCenter();
+t.straight(8, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
 t.straight(6);
-const s5 = t.lastCenter();
+const s6 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
 t.straight(10);
 
@@ -21,7 +22,7 @@ const level: LevelData = {
   obstacles: [
     { position: [s3[0] - 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true },
     { position: [s3[0] + 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s5[0], 0.75, s5[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
+    { position: [s6[0], 0.75, s6[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
   ],
 };
 

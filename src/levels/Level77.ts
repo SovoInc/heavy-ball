@@ -23,6 +23,22 @@ t.straight(8, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
 const s8 = t.lastCenter();
 const h8 = t.lastHeading();
 const y8 = t.lastSurfaceY();
+t.straight(12, { surfaceType: SurfaceType.Ice });
+const s8b = t.lastCenter();
+const h8b = t.lastHeading();
+const y8b = t.lastSurfaceY();
+t.right(6);
+// After right turn, heading is π/2 (+X)
+t.straight(7, { surfaceType: SurfaceType.Lava });
+const s8d = t.lastCenter();
+const h8d = t.lastHeading();
+const y8d = t.lastSurfaceY();
+t.straight(10, { surfaceType: SurfaceType.Crumbling });
+const s8e = t.lastCenter();
+t.straight(8, { surfaceType: SurfaceType.Speed, direction: [1, 0, 0] });
+const s8f = t.lastCenter();
+const h8f = t.lastHeading();
+const y8f = t.lastSurfaceY();
 t.straight(10);
 
 const level: LevelData = {
@@ -35,15 +51,34 @@ const level: LevelData = {
     { position: [s5[0], 0.75, s5[2] - 1], size: [1.2, 1, 1.2], breakable: true },
     { position: [s8[0] - 1, 0.75, s8[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
     { position: [s8[0] + 1, 0.75, s8[2]], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s8e[0], 0.75, s8e[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
+    { position: [s8f[0], 0.75, s8f[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
   ],
   latticeWalls: [
-    { position: [s2[0], y2, s2[2]], width: 6, height: 2, rotation: h2, gapSide: "center", gapWidth: 2.0 },
-    { position: [s5[0], y5, s5[2]], width: 6, height: 2, rotation: h5, gapSide: "left", gapWidth: 2.0 },
-    { position: [s8[0], y8, s8[2]], width: 6, height: 2, rotation: h8, gapSide: "right", gapWidth: 2.0 },
+    { position: [s2[0], y2, s2[2]], width: 6, height: 2, rotation: h2, gapSide: "center", gapWidth: 1.5 },
+    { position: [s5[0], y5, s5[2]], width: 6, height: 2, rotation: h5, gapSide: "left", gapWidth: 1.5 },
+    { position: [s8[0], y8, s8[2]], width: 6, height: 2, rotation: h8, gapSide: "right", gapWidth: 1.5 },
+    { position: [s8b[0], y8b, s8b[2]], width: 6, height: 2, rotation: h8b, gapSide: "left", gapWidth: 1.5 },
+    { position: [s8f[0], y8f, s8f[2]], width: 6, height: 2, rotation: h8f, gapSide: "center", gapWidth: 1.5 },
+  ],
+  windZones: [
+    {
+      position: [s8b[0], s8b[1] + 1, s8b[2]],
+      size: [6, 3, 12],
+      direction: [1, 0, 0],
+      strength: 15,
+    },
+    {
+      position: [s8d[0], s8d[1] + 1, s8d[2]],
+      size: [7, 3, 6],
+      direction: [0, 0, -1],
+      strength: 14,
+    },
   ],
   timedGates: [
     { position: [s3[0], 1.5, s3[2]], size: [6, 2.5, 0.5], onTime: 1.5, offTime: 1.5 },
     { position: [s5[0], 1.5, s5[2]], size: [0.5, 2.5, 6], onTime: 2.0, offTime: 2.0 },
+    { position: [s8e[0], 1.5, s8e[2]], size: [0.5, 2.5, 6], onTime: 1.5, offTime: 1.5 },
   ],
 };
 

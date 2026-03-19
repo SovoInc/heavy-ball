@@ -11,10 +11,11 @@ const s4 = t.lastCenter();
 t.left(8);
 t.straight(10);
 const s6 = t.lastCenter();
-t.straight(10);
-const s7 = t.lastCenter();
+t.straight(8, { surfaceType: SurfaceType.Ice });
 t.straight(10);
 const s8 = t.lastCenter();
+t.straight(10);
+const s9 = t.lastCenter();
 
 const level: LevelData = {
   name: "Level 2 — Icy Turn",
@@ -25,8 +26,8 @@ const level: LevelData = {
     { position: [s2[0] - 1.5, 0.75, s2[2]], size: [1.2, 1, 1.2], breakable: true },
     { position: [s4[0] + 1.5, 0.75, s4[2]], size: [1.2, 1, 1.2], breakable: true },
     { position: [s6[0], 0.75, s6[2]], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s7[0] - 1.5, 0.75, s7[2]], size: [1.2, 1, 1.2], breakable: true },
-    { position: [s8[0] + 1.5, 0.75, s8[2]], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s8[0] - 1.5, 0.75, s8[2]], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s9[0] + 1.5, 0.75, s9[2]], size: [1.2, 1, 1.2], breakable: true },
   ],
 };
 

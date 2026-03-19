@@ -9,13 +9,14 @@ const s2 = t.lastCenter();
 const h2 = t.lastHeading();
 const y2 = t.lastSurfaceY();
 t.right(8);
-// After right turn, heading is π/2 (+X)
-t.straight(8, { surfaceType: SurfaceType.Lava });
+t.straight(7, { surfaceType: SurfaceType.Lava });
+const s4 = t.lastCenter();
 t.straight(14);
 const s5 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
+t.straight(8, { surfaceType: SurfaceType.Ice });
 t.straight(14);
-const s7 = t.lastCenter();
+const s8 = t.lastCenter();
 t.straight(10);
 
 const level: LevelData = {
@@ -25,10 +26,18 @@ const level: LevelData = {
   ...t.build(),
   obstacles: [
     { position: [s5[0], 0.75, s5[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
-    { position: [s7[0], 0.75, s7[2] + 1], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s8[0], 0.75, s8[2] + 1], size: [1.2, 1, 1.2], breakable: true },
   ],
   latticeWalls: [
     { position: [s2[0], y2, s2[2]], width: 6, height: 2, rotation: h2, gapSide: "center", gapWidth: 2.5 },
+  ],
+  windZones: [
+    {
+      position: [s4[0], s4[1] + 1, s4[2]],
+      size: [7, 3, 6],
+      direction: [0, 0, -1],
+      strength: 8,
+    },
   ],
 };
 

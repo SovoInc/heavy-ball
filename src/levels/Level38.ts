@@ -16,6 +16,13 @@ t.straight(14);
 const s5 = t.lastCenter();
 t.straight(10);
 const s6 = t.lastCenter();
+const h6 = t.lastHeading();
+const y6 = t.lastSurfaceY();
+t.straight(7, { surfaceType: SurfaceType.Lava });
+const s7 = t.lastCenter();
+t.straight(10, { surfaceType: SurfaceType.Crumbling });
+const s8 = t.lastCenter();
+t.straight(10);
 
 const level: LevelData = {
   name: "Level 38 — Whirlwind",
@@ -26,9 +33,11 @@ const level: LevelData = {
     { position: [s3[0] - 1, 0.75, s3[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
     { position: [s5[0], 0.75, s5[2] + 1], size: [1.2, 1, 1.2], breakable: true },
     { position: [s6[0], 0.75, s6[2] - 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.SpeedBoost },
+    { position: [s8[0], 0.75, s8[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
   ],
   latticeWalls: [
     { position: [s3[0], y3, s3[2]], width: 6, height: 2, rotation: h3, gapSide: "center", gapWidth: 2.0 },
+    { position: [s6[0], y6, s6[2]], width: 6, height: 2, rotation: h6, gapSide: "right", gapWidth: 2.0 },
   ],
   windZones: [
     {
@@ -43,6 +52,9 @@ const level: LevelData = {
       direction: [0, 0, -1],
       strength: 10,
     },
+  ],
+  timedGates: [
+    { position: [s7[0], 0.75 + 1.25, s7[2]], size: [0.5, 2.5, 6], onTime: 2.0, offTime: 2.0 },
   ],
 };
 

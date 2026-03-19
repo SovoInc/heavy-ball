@@ -1,11 +1,13 @@
 import type { LevelData } from "./Level";
-import { TrackBuilder } from "./levelHelpers";
+import { TrackBuilder, SurfaceType } from "./levelHelpers";
 
 const t = new TrackBuilder();
 
 // === Section 1 ===
 t.straight(10);
+t.straight(8, { surfaceType: SurfaceType.Ice });
 t.straight(10);
+t.straight(7, { surfaceType: SurfaceType.Lava });
 t.straight(10);
 const tpA = t.lastCenter();
 const yA = t.lastSurfaceY();
@@ -20,7 +22,7 @@ t.straight(10);
 const tpB = t.lastCenter();
 const yB = t.lastSurfaceY();
 t.right(8);
-// After right turn, heading is π/2 (+X)
+t.straight(8, { surfaceType: SurfaceType.Crumbling });
 t.straight(14);
 const s2c = t.lastCenter();
 t.straight(14);

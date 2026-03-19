@@ -6,7 +6,7 @@ const t = new TrackBuilder();
 t.straight(10);
 t.straight(10);
 const s2 = t.lastCenter();
-t.straight(12, { surfaceType: SurfaceType.Lava });
+t.straight(7, { surfaceType: SurfaceType.Lava });
 const s3 = t.lastCenter();
 
 // Moving platform: heading is 0, dx=0, dz=-1
@@ -21,6 +21,13 @@ t.straight(12);
 const s6 = t.lastCenter();
 t.straight(10);
 const s7 = t.lastCenter();
+const h7 = t.lastHeading();
+const y7 = t.lastSurfaceY();
+t.straight(8, { surfaceType: SurfaceType.Ice });
+const s8 = t.lastCenter();
+t.straight(10, { surfaceType: SurfaceType.Crumbling });
+const s9 = t.lastCenter();
+t.straight(10);
 
 const level: LevelData = {
   name: "Level 35 — Lava Bridge",
@@ -31,14 +38,27 @@ const level: LevelData = {
     { position: [s2[0] + 1, 0.75, s2[2]], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.Shield },
     { position: [s6[0], 0.75, s6[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeBonus },
     { position: [s7[0], 0.75, s7[2] - 1], size: [1.2, 1, 1.2], breakable: true },
+    { position: [s9[0], 0.75, s9[2] + 1], size: [1.2, 1, 1.2], breakable: true, powerUp: PowerUpType.TimeFreeze },
   ],
   windZones: [
     {
       position: [s3[0], s3[1] + 1, s3[2]],
-      size: [6, 3, 12],
+      size: [6, 3, 7],
       direction: [1, 0, 0],
       strength: 8,
     },
+    {
+      position: [s8[0], s8[1] + 1, s8[2]],
+      size: [8, 3, 6],
+      direction: [0, 0, -1],
+      strength: 10,
+    },
+  ],
+  latticeWalls: [
+    { position: [s7[0], y7, s7[2]], width: 6, height: 2, rotation: h7, gapSide: "center", gapWidth: 2.0 },
+  ],
+  timedGates: [
+    { position: [s9[0], 0.75 + 1.25, s9[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 2 },
   ],
 };
 
