@@ -4,215 +4,352 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Heavy Ball</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #111;
-        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        width: 100%; height: 100%; overflow: hidden;
+        background: #060609;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
         color: #fff;
       }
+
+      /* ── Canvas ── */
       #game-canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: block;
-        width: 100%;
-        height: 100%;
+        position: absolute; top: 0; left: 0;
+        display: block; width: 100%; height: 100%;
       }
+
+      /* ── In-game HUD ── */
       #hud {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
         pointer-events: none;
       }
-      #hud > * {
-        pointer-events: auto;
-      }
+      #hud > * { pointer-events: auto; }
       #hud-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        display: flex; justify-content: space-between; align-items: center;
         padding: 16px 24px;
       }
       #hud-level {
-        font-size: 18px;
-        font-weight: 600;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        font-family: 'Orbitron', monospace;
+        font-size: 15px; font-weight: 700;
+        letter-spacing: 1px; text-transform: uppercase;
+        text-shadow: 0 0 12px rgba(100,180,255,0.4), 0 2px 8px rgba(0,0,0,0.6);
+        color: #c0deff;
       }
       #hud-timer {
-        font-size: 22px;
-        font-weight: 700;
+        font-family: 'Orbitron', monospace;
+        font-size: 24px; font-weight: 700;
         font-variant-numeric: tabular-nums;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        text-shadow: 0 0 16px rgba(100,180,255,0.3), 0 2px 8px rgba(0,0,0,0.6);
+        color: #e8f0ff;
       }
       #hud-restart {
-        background: rgba(255,255,255,0.12);
-        border: 1px solid rgba(255,255,255,0.2);
-        color: #fff;
-        padding: 6px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
+        background: rgba(255,60,60,0.15);
+        border: 1px solid rgba(255,80,80,0.3);
+        color: rgba(255,160,160,0.9); padding: 6px 18px;
+        border-radius: 6px; cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px; font-weight: 600;
+        letter-spacing: 0.5px; text-transform: uppercase;
         backdrop-filter: blur(8px);
-        transition: background 0.2s;
+        transition: all 0.2s;
       }
       #hud-restart:hover {
-        background: rgba(255,255,255,0.22);
+        background: rgba(255,60,60,0.3);
+        border-color: rgba(255,80,80,0.5);
       }
+
+      /* ── Overlay (menu screens) ── */
       #overlay {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        z-index: 10; pointer-events: auto;
+        overflow: hidden;
+      }
+      #overlay::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: url('./assets/menu-bg.png') center/cover no-repeat;
+        filter: brightness(0.5);
+        z-index: -2;
+      }
+      #overlay::after {
+        content: '';
+        position: absolute; inset: 0;
+        background:
+          radial-gradient(ellipse at center, transparent 30%, rgba(6,6,9,0.7) 100%),
+          radial-gradient(ellipse at 30% 80%, rgba(255,120,40,0.06) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 20%, rgba(80,120,255,0.06) 0%, transparent 50%),
+          linear-gradient(180deg, rgba(6,6,9,0.4) 0%, rgba(6,6,9,0.15) 35%, rgba(6,6,9,0.5) 100%);
+        z-index: -1;
+      }
+      #overlay.hidden { display: none; }
+
+      /* Overlay content card */
+      #overlay-content {
+        display: flex; flex-direction: column;
         align-items: center;
-        justify-content: center;
-        background: rgba(0,0,0,0.65);
-        backdrop-filter: blur(12px);
-        z-index: 10;
-        pointer-events: auto;
+        padding: 52px 60px;
+        background: rgba(8, 8, 18, 0.82);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 24px;
+        backdrop-filter: blur(40px) saturate(1.2);
+        box-shadow:
+          0 32px 100px rgba(0,0,0,0.6),
+          0 0 0 1px rgba(255,255,255,0.03),
+          inset 0 1px 0 rgba(255,255,255,0.06);
+        max-width: 480px;
+        width: 90%;
       }
-      #overlay.hidden {
-        display: none;
-      }
+
+      /* Title */
       #overlay h1 {
-        font-size: 48px;
-        font-weight: 800;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 38px; font-weight: 900;
+        letter-spacing: 3px; text-transform: uppercase;
+        white-space: nowrap;
+        background: linear-gradient(135deg, #e8f0ff 0%, #8bb8ff 40%, #c8a0ff 70%, #ff9060 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 2px 12px rgba(100,140,255,0.3));
         margin-bottom: 8px;
-        letter-spacing: -1px;
       }
-      #overlay p {
-        font-size: 18px;
-        opacity: 0.7;
+
+      /* Subtitle */
+      #overlay-subtitle {
+        font-size: 15px; font-weight: 500;
+        color: rgba(200,210,230,0.7);
+        letter-spacing: 0.5px;
         margin-bottom: 32px;
-      }
-      #alias-input {
-        padding: 10px 18px;
-        border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.3);
-        background: rgba(255,255,255,0.1);
-        color: #fff;
-        font-size: 16px;
         text-align: center;
-        margin-bottom: 16px;
-        outline: none;
-        width: 200px;
+        line-height: 1.5;
       }
-      #alias-input::placeholder {
-        color: rgba(255,255,255,0.4);
+
+      /* Player badge */
+      .player-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 14px;
+        background: rgba(100,160,255,0.1);
+        border: 1px solid rgba(100,160,255,0.2);
+        border-radius: 20px;
+        font-size: 12px; font-weight: 600;
+        color: rgba(160,200,255,0.9);
+        letter-spacing: 0.5px;
+        margin-bottom: 24px;
       }
-      #leaderboard-panel {
-        display: none;
-        max-height: 300px;
-        overflow-y: auto;
-        margin: 16px 0;
-        width: 320px;
+      .player-badge .dot {
+        width: 6px; height: 6px;
+        background: #4ade80; border-radius: 50%;
+        box-shadow: 0 0 6px rgba(74,222,128,0.5);
       }
-      #leaderboard-panel table {
+
+      /* Buttons */
+      #overlay-buttons {
+        display: flex; flex-direction: column;
+        align-items: center; gap: 10px;
         width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-      }
-      #leaderboard-panel th, #leaderboard-panel td {
-        padding: 6px 10px;
-        text-align: left;
-      }
-      #leaderboard-panel th {
-        opacity: 0.6;
-        font-weight: 600;
-        border-bottom: 1px solid rgba(255,255,255,0.15);
-      }
-      #leaderboard-panel td {
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-      }
-      #stats-panel {
-        display: none;
-        font-size: 14px;
-        opacity: 0.8;
-        margin: 12px 0;
       }
       .overlay-btn {
-        background: #fff;
-        color: #111;
-        border: none;
-        padding: 12px 36px;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
+        position: relative;
+        width: 100%; max-width: 280px;
+        padding: 14px 32px;
+        border: none; border-radius: 10px;
+        font-family: 'Inter', sans-serif;
+        font-size: 15px; font-weight: 700;
+        letter-spacing: 0.5px; text-transform: uppercase;
         cursor: pointer;
-        margin: 6px;
-        transition: transform 0.15s, box-shadow 0.15s;
+        transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        overflow: hidden;
       }
-      .overlay-btn:hover {
+      .overlay-btn.primary {
+        background: linear-gradient(135deg, #6488ff 0%, #8b5cf6 100%);
+        color: #fff;
+        box-shadow: 0 4px 20px rgba(100,136,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+      }
+      .overlay-btn.primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(255,255,255,0.2);
+        box-shadow: 0 8px 32px rgba(100,136,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+        filter: brightness(1.1);
+      }
+      .overlay-btn.primary:active {
+        transform: translateY(0);
       }
       .overlay-btn.secondary {
-        background: rgba(255,255,255,0.15);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.06);
+        color: rgba(200,210,230,0.9);
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(8px);
       }
+      .overlay-btn.secondary:hover {
+        background: rgba(255,255,255,0.12);
+        border-color: rgba(255,255,255,0.2);
+        transform: translateY(-1px);
+      }
+      .overlay-btn.wallet {
+        background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(100,136,255,0.2) 100%);
+        color: rgba(200,180,255,0.95);
+        border: 1px solid rgba(139,92,246,0.3);
+      }
+      .overlay-btn.wallet:hover {
+        background: linear-gradient(135deg, rgba(139,92,246,0.3) 0%, rgba(100,136,255,0.3) 100%);
+        border-color: rgba(139,92,246,0.5);
+        transform: translateY(-1px);
+      }
+      .overlay-btn.danger {
+        background: none; border: none;
+        color: rgba(255,255,255,0.35);
+        font-size: 12px; padding: 8px 16px;
+        text-transform: none; font-weight: 500;
+        letter-spacing: 0;
+      }
+      .overlay-btn.danger:hover {
+        color: rgba(255,100,100,0.7);
+      }
+      .overlay-btn:disabled {
+        opacity: 0.5; cursor: not-allowed;
+        transform: none !important;
+      }
+
+      /* Divider */
+      .menu-divider {
+        display: flex; align-items: center; gap: 12px;
+        width: 100%; max-width: 280px;
+        margin: 4px 0;
+        color: rgba(255,255,255,0.2);
+        font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .menu-divider::before, .menu-divider::after {
+        content: ''; flex: 1;
+        height: 1px;
+        background: rgba(255,255,255,0.08);
+      }
+
+      /* Divider (unused, kept for menu-divider class) */
+
+      /* Time display */
+      #overlay-time {
+        font-family: 'Orbitron', monospace;
+        font-size: 28px; font-weight: 700;
+        color: #e8f0ff;
+        text-shadow: 0 0 20px rgba(100,180,255,0.3);
+        margin-top: 4px; margin-bottom: 24px;
+      }
+
+      /* Leaderboard */
+      #leaderboard-panel {
+        display: none;
+        max-height: 260px; overflow-y: auto;
+        margin-top: 16px; width: 100%;
+        background: rgba(0,0,0,0.2);
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 4px;
+      }
+      #leaderboard-panel::-webkit-scrollbar { width: 4px; }
+      #leaderboard-panel::-webkit-scrollbar-track { background: transparent; }
+      #leaderboard-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+      #leaderboard-panel table {
+        width: 100%; border-collapse: collapse; font-size: 13px;
+      }
+      #leaderboard-panel th {
+        padding: 8px 12px; text-align: left;
+        color: rgba(255,255,255,0.4);
+        font-size: 10px; font-weight: 600;
+        letter-spacing: 1px; text-transform: uppercase;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+      }
+      #leaderboard-panel td {
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.03);
+        color: rgba(255,255,255,0.7);
+      }
+      #leaderboard-panel tr:hover td {
+        background: rgba(255,255,255,0.03);
+      }
+      #leaderboard-panel td:first-child {
+        color: rgba(100,160,255,0.8); font-weight: 700;
+      }
+
+      /* Stats */
+      #stats-panel {
+        display: none;
+        font-size: 13px; color: rgba(255,255,255,0.5);
+        margin-top: 12px; text-align: center;
+      }
+
+      /* Error message */
+      .wallet-error {
+        color: #ff6b6b; font-size: 12px;
+        margin-top: 6px; text-align: center;
+      }
+
+      /* ── Power-ups ── */
       #hud-powerups {
-        position: absolute;
-        bottom: 80px;
-        left: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        position: absolute; bottom: 80px; left: 24px;
+        display: flex; flex-direction: column; gap: 6px;
         pointer-events: none;
       }
       .powerup-indicator {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 600;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13px; font-weight: 600;
         text-shadow: 0 1px 4px rgba(0,0,0,0.6);
       }
       .powerup-bar {
-        width: 60px;
-        height: 4px;
+        width: 60px; height: 4px;
         background: rgba(255,255,255,0.15);
-        border-radius: 2px;
-        overflow: hidden;
+        border-radius: 2px; overflow: hidden;
       }
       .powerup-bar-fill {
-        height: 100%;
-        border-radius: 2px;
+        height: 100%; border-radius: 2px;
         transition: width 0.1s linear;
       }
+
+      /* ── Toast ── */
       #hud-toast {
-        position: absolute;
-        top: 60px;
-        left: 50%;
+        position: absolute; top: 60px; left: 50%;
         transform: translateX(-50%);
-        font-size: 16px;
-        font-weight: 700;
+        font-family: 'Orbitron', monospace;
+        font-size: 16px; font-weight: 700;
         text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-        opacity: 0;
-        transition: opacity 0.3s;
+        opacity: 0; transition: opacity 0.3s;
         pointer-events: none;
       }
-      #hud-toast.show {
-        opacity: 1;
-      }
+      #hud-toast.show { opacity: 1; }
+
+      /* ── Controls hint ── */
       #controls-hint {
-        position: absolute;
-        bottom: 24px;
-        left: 50%;
+        position: absolute; bottom: 24px; left: 50%;
         transform: translateX(-50%);
-        font-size: 13px;
-        opacity: 0.5;
+        font-size: 12px; opacity: 0.4;
+        letter-spacing: 0.5px;
         text-shadow: 0 1px 4px rgba(0,0,0,0.5);
         pointer-events: none;
+      }
+
+      /* ── Animations ── */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% center; }
+        100% { background-position: 200% center; }
+      }
+      #overlay-content {
+        animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .overlay-btn.primary::after {
+        content: '';
+        position: absolute; inset: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 3s ease-in-out infinite;
       }
     </style>
   </head>
@@ -228,14 +365,16 @@
       <div id="hud-toast"></div>
     </div>
     <div id="overlay">
-      <h1>Heavy Ball</h1>
-      <p>Guide the ball to the finish</p>
-      <div id="overlay-buttons">
-        <button class="overlay-btn" id="btn-start">Start</button>
+      <div id="overlay-content">
+        <h1>Heavy Ball</h1>
+        <div id="overlay-subtitle">Connect your wallet to play</div>
+        <div id="overlay-buttons">
+          <button class="overlay-btn primary" id="btn-wallet-connect">Connect Midnight Wallet</button>
+        </div>
+        <div id="overlay-time" style="display:none;"></div>
+        <div id="leaderboard-panel"></div>
+        <div id="stats-panel"></div>
       </div>
-      <div id="overlay-time" style="margin-top:16px; font-size:20px; display:none;"></div>
-      <div id="leaderboard-panel"></div>
-      <div id="stats-panel"></div>
     </div>
     <div id="controls-hint">WASD / Arrow Keys to move</div>
     <script type="module" src="/src/main.ts"></script>

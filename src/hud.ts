@@ -28,8 +28,9 @@ export class HUD {
   private timerEl: HTMLElement;
   private restartBtn: HTMLElement;
   private overlay: HTMLElement;
+  private overlayContent: HTMLElement;
   private overlayH1: HTMLElement;
-  private overlayP: HTMLElement;
+  private overlaySubtitle: HTMLElement;
   private overlayBtns: HTMLElement;
   private overlayTime: HTMLElement;
   private controlsHint: HTMLElement;
@@ -48,7 +49,6 @@ export class HUD {
   onStart?: () => void;
   onNextLevel?: () => void;
   onLevelSelect?: (index: number) => void;
-  onAliasSubmit?: (alias: string) => void;
   onWalletConnect?: () => void;
   onWalletDisconnect?: () => void;
 
@@ -57,8 +57,9 @@ export class HUD {
     this.timerEl = document.getElementById("hud-timer")!;
     this.restartBtn = document.getElementById("hud-restart")!;
     this.overlay = document.getElementById("overlay")!;
+    this.overlayContent = document.getElementById("overlay-content")!;
     this.overlayH1 = this.overlay.querySelector("h1")!;
-    this.overlayP = this.overlay.querySelector("p")!;
+    this.overlaySubtitle = document.getElementById("overlay-subtitle")!;
     this.overlayBtns = document.getElementById("overlay-buttons")!;
     this.overlayTime = document.getElementById("overlay-time")!;
     this.controlsHint = document.getElementById("controls-hint")!;
@@ -72,9 +73,10 @@ export class HUD {
     this.levelSelectEl.id = "level-select";
     this.levelSelectEl.style.cssText = `
       display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-      background:rgba(10,10,20,0.95);border:1px solid rgba(255,255,255,0.15);
-      border-radius:12px;padding:20px;z-index:1000;max-height:80vh;overflow-y:auto;
-      min-width:220px;
+      background:rgba(10,10,20,0.95);border:1px solid rgba(255,255,255,0.1);
+      border-radius:16px;padding:20px;z-index:1000;max-height:80vh;overflow-y:auto;
+      min-width:240px;backdrop-filter:blur(20px);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     `;
     document.body.appendChild(this.levelSelectEl);
 
@@ -90,11 +92,6 @@ export class HUD {
       if (target.id === "btn-next") this.onNextLevel?.();
       if (target.id === "btn-replay") this.onLevelSelect?.(this.currentLevelIndex);
       if (target.id === "btn-play-again") this.onLevelSelect?.(0);
-      if (target.id === "btn-alias-submit") {
-        const input = document.getElementById("alias-input") as HTMLInputElement;
-        const alias = input?.value.trim();
-        if (alias) this.onAliasSubmit?.(alias);
-      }
       if (target.id === "btn-wallet-connect") {
         this.onWalletConnect?.();
       }
@@ -107,7 +104,22 @@ export class HUD {
       if (target.id === "btn-highscores") {
         this.toggleGlobalLeaderboard();
       }
+      if (target.id === "btn-leaderboard-back") {
+        this.hideLeaderboardView();
+      }
     });
+  }
+
+  private resetOverlay() {
+    this.overlayTime.style.display = "none";
+    this.leaderboardPanel.style.display = "none";
+    this.statsPanel.style.display = "none";
+    // Clean up dynamic elements (badges, errors)
+    this.overlayContent.querySelectorAll(".player-badge, .wallet-error").forEach(el => el.remove());
+    // Re-trigger entry animation
+    this.overlayContent.style.animation = "none";
+    void this.overlayContent.offsetHeight;
+    this.overlayContent.style.animation = "";
   }
 
   setLevel(name: string, index: number) {
@@ -178,40 +190,14 @@ export class HUD {
     this.powerupsEl.innerHTML = "";
   }
 
-  showAliasEntry(hasWallet = false) {
+  showWalletLogin() {
+    this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
-    this.overlayP.textContent = hasWallet
-      ? "Connect your wallet or enter a name"
-      : "Enter your name to play";
-
-    const walletBtn = hasWallet
-      ? `<button class="overlay-btn" id="btn-wallet-connect">Connect Wallet</button>
-         <div style="opacity:0.4;font-size:13px;margin:8px 0">or</div>`
-      : "";
-
+    this.overlaySubtitle.textContent = "Connect your wallet to play";
     this.overlayBtns.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-        ${walletBtn}
-        <input type="text" id="alias-input" placeholder="Your name" maxlength="20" autocomplete="off" />
-        <button class="overlay-btn${hasWallet ? " secondary" : ""}" id="btn-alias-submit">Play</button>
-      </div>
+      <button class="overlay-btn primary" id="btn-wallet-connect">Connect Midnight Wallet</button>
     `;
-    this.overlayTime.style.display = "none";
-    this.leaderboardPanel.style.display = "none";
-    this.statsPanel.style.display = "none";
     this.overlay.classList.remove("hidden");
-
-    // Focus input after render
-    requestAnimationFrame(() => {
-      const input = document.getElementById("alias-input") as HTMLInputElement;
-      input?.focus();
-      input?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          const alias = input.value.trim();
-          if (alias) this.onAliasSubmit?.(alias);
-        }
-      });
-    });
   }
 
   showWalletConnecting() {
@@ -228,58 +214,62 @@ export class HUD {
       btn.textContent = "Connect Wallet";
       (btn as HTMLButtonElement).disabled = false;
     }
-    // Show error below buttons
     let errorEl = document.getElementById("wallet-error");
     if (!errorEl) {
       errorEl = document.createElement("div");
       errorEl.id = "wallet-error";
-      errorEl.style.cssText = "color:#ff6666;font-size:13px;margin-top:8px;text-align:center";
+      errorEl.className = "wallet-error";
       this.overlayBtns.appendChild(errorEl);
     }
     errorEl.textContent = message;
   }
 
   showStartScreen(continueLevel = 0, playerIdentifier?: string) {
+    this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
 
-    let statusText = "";
-    if (playerIdentifier) {
-      statusText = `<span style="font-size:13px;opacity:0.5">${this.escapeHtml(playerIdentifier)}</span><br>`;
-    }
-
-    if (continueLevel > 0) {
-      this.overlayP.innerHTML = `${statusText}Progress: Level ${continueLevel} completed`;
-    } else {
-      this.overlayP.innerHTML = `${statusText}Guide the ball to the finish`;
-    }
-
-    const disconnectBtn = playerIdentifier
-      ? `<button class="overlay-btn secondary" id="btn-wallet-disconnect" style="font-size:12px;padding:6px 16px">Logout</button>`
+    const badge = playerIdentifier
+      ? `<div class="player-badge"><span class="dot"></span>${this.escapeHtml(playerIdentifier)}</div>`
       : "";
 
-    const btns = continueLevel > 0
-      ? `<button class="overlay-btn" id="btn-continue" data-level="${continueLevel}">Continue (Level ${continueLevel + 1})</button>
-         <button class="overlay-btn secondary" id="btn-start">New Game</button>
-         <button class="overlay-btn secondary" id="btn-highscores">High Scores</button>
-         ${disconnectBtn}`
-      : `<button class="overlay-btn" id="btn-start">Start</button>
-         <button class="overlay-btn secondary" id="btn-highscores">High Scores</button>
-         ${disconnectBtn}`;
+    const subtitle = continueLevel > 0
+      ? `Level ${continueLevel} completed`
+      : "Guide the ball to the finish";
 
-    this.overlayBtns.innerHTML = btns;
-    this.overlayTime.style.display = "none";
-    this.leaderboardPanel.style.display = "none";
-    this.statsPanel.style.display = "none";
+    this.overlaySubtitle.innerHTML = subtitle;
+
+    // Insert badge before subtitle if player is logged in
+    if (badge) {
+      this.overlaySubtitle.insertAdjacentHTML("beforebegin", badge);
+    }
+
+    const logoutBtn = playerIdentifier
+      ? `<button class="overlay-btn danger" id="btn-wallet-disconnect">Sign out</button>`
+      : "";
+
+    if (continueLevel > 0) {
+      this.overlayBtns.innerHTML = `
+        <button class="overlay-btn primary" id="btn-continue" data-level="${continueLevel}">Continue &mdash; Level ${continueLevel + 1}</button>
+        <button class="overlay-btn secondary" id="btn-start">New Game</button>
+        <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${logoutBtn}
+      `;
+    } else {
+      this.overlayBtns.innerHTML = `
+        <button class="overlay-btn primary" id="btn-start">Play</button>
+        <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${logoutBtn}
+      `;
+    }
     this.overlay.classList.remove("hidden");
   }
 
   showLevelComplete(timeMs: number, isLastLevel: boolean, levelNumber?: number) {
-    this.overlayH1.textContent = "Level Complete!";
-    this.overlayP.textContent = "";
+    this.resetOverlay();
+    this.overlayH1.textContent = "Level Complete";
+    this.overlaySubtitle.textContent = "";
     this.overlayTime.style.display = "block";
-    this.overlayTime.textContent = `Time: ${this.formatTime(timeMs)}`;
-    this.leaderboardPanel.style.display = "none";
-    this.statsPanel.style.display = "none";
+    this.overlayTime.textContent = this.formatTime(timeMs);
 
     const leaderboardBtn = levelNumber
       ? `<button class="overlay-btn secondary" id="btn-leaderboard" data-level="${levelNumber}">Leaderboard</button>`
@@ -287,51 +277,85 @@ export class HUD {
 
     if (isLastLevel) {
       this.overlayBtns.innerHTML = `
-        <button class="overlay-btn" id="btn-replay">Play Again</button>
+        <button class="overlay-btn primary" id="btn-replay">Play Again</button>
         ${leaderboardBtn}
       `;
     } else {
       this.overlayBtns.innerHTML = `
-        <button class="overlay-btn" id="btn-next">Next Level</button>
+        <button class="overlay-btn primary" id="btn-next">Next Level</button>
         <button class="overlay-btn secondary" id="btn-replay">Replay</button>
         ${leaderboardBtn}
       `;
     }
-
     this.overlay.classList.remove("hidden");
   }
 
   showAllComplete(timeMs: number) {
+    this.resetOverlay();
     this.overlayH1.textContent = "You Win!";
-    this.overlayP.textContent = "All levels complete";
+    this.overlaySubtitle.textContent = "All levels complete";
     this.overlayTime.style.display = "block";
-    this.overlayTime.textContent = `Final time: ${this.formatTime(timeMs)}`;
-    this.leaderboardPanel.style.display = "none";
-    this.statsPanel.style.display = "none";
+    this.overlayTime.textContent = this.formatTime(timeMs);
     this.overlayBtns.innerHTML = `
-      <button class="overlay-btn" id="btn-play-again">Play Again</button>
+      <button class="overlay-btn primary" id="btn-play-again">Play Again</button>
     `;
     this.overlay.classList.remove("hidden");
   }
 
+  private savedMenuState: { buttons: string; title: string; subtitle: string; badges: string } | null = null;
+
+  private showLeaderboardView() {
+    // Save current menu state
+    const badges: string[] = [];
+    this.overlayContent.querySelectorAll(".player-badge").forEach(el => {
+      badges.push(el.outerHTML);
+      el.remove();
+    });
+    this.savedMenuState = {
+      buttons: this.overlayBtns.innerHTML,
+      title: this.overlayH1.textContent ?? "",
+      subtitle: this.overlaySubtitle.innerHTML,
+      badges: badges.join(""),
+    };
+    this.overlayBtns.innerHTML = `
+      <button class="overlay-btn secondary" id="btn-leaderboard-back">Back</button>
+    `;
+    this.overlayH1.textContent = "Leaderboard";
+    this.overlaySubtitle.textContent = "";
+    this.leaderboardPanel.style.display = "block";
+  }
+
+  private hideLeaderboardView() {
+    this.leaderboardPanel.style.display = "none";
+    if (this.savedMenuState) {
+      this.overlayH1.textContent = this.savedMenuState.title;
+      this.overlaySubtitle.innerHTML = this.savedMenuState.subtitle;
+      this.overlayBtns.innerHTML = this.savedMenuState.buttons;
+      if (this.savedMenuState.badges) {
+        this.overlaySubtitle.insertAdjacentHTML("beforebegin", this.savedMenuState.badges);
+      }
+      this.savedMenuState = null;
+    }
+  }
+
   private async toggleGlobalLeaderboard() {
     if (this.leaderboardPanel.style.display === "block") {
-      this.leaderboardPanel.style.display = "none";
+      this.hideLeaderboardView();
       return;
     }
 
-    this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Loading...</p>";
-    this.leaderboardPanel.style.display = "block";
+    this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Loading...</p>";
+    this.showLeaderboardView();
 
     try {
       const entries = await api.getLeaderboard(20);
       if (entries.length === 0) {
-        this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>No scores yet</p>";
+        this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>No scores yet</p>";
         return;
       }
       this.leaderboardPanel.innerHTML = `
         <table>
-          <thead><tr><th>#</th><th>Player</th><th>Level</th><th>Total Time</th></tr></thead>
+          <thead><tr><th>#</th><th>Player</th><th>Level</th><th>Time</th></tr></thead>
           <tbody>
             ${entries.map((s: LeaderboardEntry) => `
               <tr>
@@ -345,23 +369,23 @@ export class HUD {
         </table>
       `;
     } catch {
-      this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Could not load leaderboard</p>";
+      this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Could not load</p>";
     }
   }
 
   private async toggleLeaderboard(level: number) {
     if (this.leaderboardPanel.style.display === "block") {
-      this.leaderboardPanel.style.display = "none";
+      this.hideLeaderboardView();
       return;
     }
 
-    this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Loading...</p>";
-    this.leaderboardPanel.style.display = "block";
+    this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Loading...</p>";
+    this.showLeaderboardView();
 
     try {
       const scores = await api.getTopScores(level, 20);
       if (scores.length === 0) {
-        this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>No scores yet</p>";
+        this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>No scores yet</p>";
         return;
       }
       this.leaderboardPanel.innerHTML = `
@@ -379,7 +403,7 @@ export class HUD {
         </table>
       `;
     } catch {
-      this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Could not load leaderboard</p>";
+      this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Could not load</p>";
     }
   }
 
@@ -408,16 +432,16 @@ export class HUD {
     const items = Array.from({ length: levelCount }, (_, i) => {
       const isCurrent = i === currentIndex;
       return `<button class="level-select-btn${isCurrent ? " current" : ""}" data-level-index="${i}" style="
-        display:block;width:100%;padding:8px 14px;margin:4px 0;
-        background:${isCurrent ? "rgba(68,136,204,0.3)" : "rgba(255,255,255,0.05)"};
-        border:1px solid ${isCurrent ? "rgba(68,136,204,0.6)" : "rgba(255,255,255,0.1)"};
-        border-radius:6px;color:#ccc;font-size:14px;cursor:pointer;text-align:left;
-        font-family:inherit;
+        display:block;width:100%;padding:10px 14px;margin:3px 0;
+        background:${isCurrent ? "rgba(100,136,255,0.15)" : "rgba(255,255,255,0.03)"};
+        border:1px solid ${isCurrent ? "rgba(100,136,255,0.3)" : "rgba(255,255,255,0.06)"};
+        border-radius:8px;color:rgba(200,210,230,0.8);font-size:13px;cursor:pointer;text-align:left;
+        font-family:'Inter',sans-serif;font-weight:500;transition:all 0.15s;
       ">Level ${i + 1}</button>`;
     }).join("");
 
     this.levelSelectEl.innerHTML = `
-      <div style="color:#aaa;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Select Level</div>
+      <div style="color:rgba(255,255,255,0.4);font-size:10px;text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:12px">Select Level</div>
       ${items}
     `;
     this.levelSelectEl.style.display = "block";
