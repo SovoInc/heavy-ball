@@ -132,7 +132,6 @@ export class Controls {
   private gameKeys = new Set([
     "KeyW", "KeyA", "KeyS", "KeyD",
     "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-    "KeyR",
   ]);
 
   private onKeyDown = (e: KeyboardEvent) => {
@@ -204,10 +203,6 @@ export class Controls {
       ball.body.wakeUp();
       ball.body.applyForce(force);
     }
-  }
-
-  isRestartPressed(): boolean {
-    return this.keys.has("KeyR");
   }
 
   dispose() {
