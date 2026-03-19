@@ -3,11 +3,16 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 export interface PlayerData {
   id: number;
   alias: string;
+  wallet_address?: string | null;
+  network_id?: string;
+  auth_token?: string;
 }
 
 export interface ScoreEntry {
   rank: number;
   alias: string;
+  display_name?: string;
+  wallet_address?: string | null;
   time_ms: number;
   player_id: number;
 }
@@ -32,10 +37,37 @@ export interface PlayerStatsData {
   levels_completed: number;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  alias: string;
+  display_name?: string;
+  wallet_address?: string | null;
+  player_id: number;
+  max_level: number;
+  total_time_ms: number;
+}
+
+export interface PlayerProgress {
+  max_level: number;
+  total_time_ms: number;
+}
+
+let _authToken = "";
+
+export function setAuthToken(token: string) {
+  _authToken = token;
+}
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (_authToken) h["Authorization"] = `Bearer ${_authToken}`;
+  return h;
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -43,14 +75,29 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const h: Record<string, string> = {};
+  if (_authToken) h["Authorization"] = `Bearer ${_authToken}`;
+  const res = await fetch(`${BASE}${path}`, { headers: h });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
+}
+
+export function shortenWalletAddress(value: string): string {
+  if (value.length <= 14) return value;
+  return `${value.slice(0, 3)}...${value.slice(-8)}`;
+}
+
+export function getDisplayName(entry: { alias?: string; display_name?: string; wallet_address?: string | null }): string {
+  if (entry.wallet_address) return shortenWalletAddress(entry.wallet_address);
+  return entry.display_name ?? entry.alias ?? "Unknown";
 }
 
 export const api = {
   registerAlias: (alias: string) =>
     post<PlayerData>("/api/alias", { alias }),
+
+  registerWallet: (walletAddress: string, networkId: string) =>
+    post<PlayerData>("/api/wallet", { wallet_address: walletAddress, network_id: networkId }),
 
   submitScore: (data: RunData) =>
     post<{ id: number }>("/api/scores", data),
@@ -69,4 +116,10 @@ export const api = {
 
   getPlayerAchievements: (playerId: number) =>
     get<AchievementEntry[]>(`/api/achievements/${playerId}`),
+
+  getLeaderboard: (limit = 20) =>
+    get<LeaderboardEntry[]>(`/api/leaderboard?limit=${limit}`),
+
+  getProgress: (playerId: number) =>
+    get<PlayerProgress>(`/api/progress/${playerId}`),
 };

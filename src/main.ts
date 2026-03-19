@@ -10,8 +10,9 @@ import { DebugRenderer } from "./debug";
 import { playFall, playLevelComplete, playPowerUp, updateRoll } from "./audio";
 import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
-import { api } from "./api";
-import { getPlayer, setPlayer, type PlayerState } from "./player";
+import { api, setAuthToken, shortenWalletAddress } from "./api";
+import { getPlayer, setPlayer, clearPlayer, type PlayerState } from "./player";
+import { hasMidnightWallet, connectMidnightWallet, getMidnightWalletError, MIDNIGHT_NETWORK_ID } from "./midnight";
 
 type GameState = "menu" | "playing" | "levelComplete" | "allComplete";
 
@@ -27,7 +28,6 @@ class Game {
   private powerUpManager: PowerUpManager;
   private state: GameState = "menu";
   private lastTime = 0;
-  private restartCooldown = 0;
   private screenShake = 0;
   private fallCount = 0;
   private currentBallScale = 1;
@@ -58,10 +58,35 @@ class Game {
     // Check for existing player
     this.player = getPlayer();
     if (this.player) {
-      this.hud.showStartScreen();
+      // Restore auth token if available
+      if (this.player.auth_token) {
+        setAuthToken(this.player.auth_token);
+      }
+      this.showStartWithProgress();
     } else {
-      this.hud.showAliasEntry();
+      this.hud.showAliasEntry(hasMidnightWallet());
     }
+  }
+
+  private getPlayerIdentifier(): string | undefined {
+    if (!this.player) return undefined;
+    if (this.player.wallet_address) {
+      return shortenWalletAddress(this.player.wallet_address);
+    }
+    return this.player.alias;
+  }
+
+  private async showStartWithProgress() {
+    let continueLevel = 0;
+    if (this.player && this.player.id > 0) {
+      try {
+        const progress = await api.getProgress(this.player.id);
+        continueLevel = progress.max_level;
+      } catch {
+        // Offline — start from 0
+      }
+    }
+    this.hud.showStartScreen(continueLevel, this.getPlayerIdentifier());
   }
 
   private setupLevelSelectKey() {
@@ -111,22 +136,62 @@ class Game {
       try {
         const data = await api.registerAlias(alias);
         this.player = { id: data.id, alias: data.alias };
+        if (data.auth_token) {
+          this.player.auth_token = data.auth_token;
+          setAuthToken(data.auth_token);
+        }
         setPlayer(this.player);
-        this.hud.showStartScreen();
       } catch {
         // If server is down, play offline
         this.player = { id: 0, alias };
         setPlayer(this.player);
-        this.hud.showStartScreen();
       }
+      await this.showStartWithProgress();
+    };
+
+    this.hud.onWalletConnect = async () => {
+      this.hud.showWalletConnecting();
+      try {
+        const connection = await connectMidnightWallet();
+        const data = await api.registerWallet(connection.address, MIDNIGHT_NETWORK_ID);
+        this.player = {
+          id: data.id,
+          alias: data.alias ?? `wallet:${connection.address}`,
+          wallet_address: data.wallet_address ?? connection.address,
+          network_id: data.network_id ?? MIDNIGHT_NETWORK_ID,
+          auth_token: data.auth_token,
+        };
+        if (data.auth_token) {
+          setAuthToken(data.auth_token);
+        }
+        setPlayer(this.player);
+        await this.showStartWithProgress();
+      } catch (err) {
+        this.hud.showWalletError(getMidnightWalletError(err));
+      }
+    };
+
+    this.hud.onWalletDisconnect = () => {
+      clearPlayer();
+      setAuthToken("");
+      this.player = null;
+      this.totalBoxesBroken = 0;
+      this.totalPowerUpsCollected = 0;
+      this.totalSpeedBoosts = 0;
+      this.completedLevels.clear();
+      this.hud.showAliasEntry(hasMidnightWallet());
     };
 
     this.hud.onStart = () => {
       this.startLevel(0);
     };
 
-    this.hud.onRestart = () => {
-      this.restartCurrentLevel();
+    this.hud.onGiveUp = () => {
+      this.controls.setEnabled(false);
+      this.hud.stopTimer();
+      this.hud.clearPowerUps();
+      this.state = "menu";
+      this.showStartWithProgress();
     };
 
     this.hud.onNextLevel = () => {
@@ -157,7 +222,7 @@ class Game {
     this.currentBallScale = 1;
     this.controls.speedMultiplier = 1;
     this.hud.clearPowerUps();
-    this.hud.setLevel(this.levelManager.currentLevelName);
+    this.hud.setLevel(this.levelManager.currentLevelName, this.levelManager.currentLevelNumber - 1);
     this.hud.startTimer();
     this.camera.snapTo(this.ball);
     this.controls.setEnabled(true);
@@ -168,12 +233,6 @@ class Game {
         this.powerUpManager.activate(type);
       };
     }
-  }
-
-  private restartCurrentLevel() {
-    this.hud.hideOverlay();
-    this.levelManager.restartCurrent(this.ball);
-    this.onLevelStart();
   }
 
   private async submitScore(timeMs: number) {
@@ -296,16 +355,6 @@ class Game {
 
       if (!this.powerUpManager.isTimeFrozen()) {
         this.hud.updateTimer(dt);
-      }
-
-      if (this.controls.isRestartPressed()) {
-        this.restartCooldown -= dt;
-        if (this.restartCooldown <= 0) {
-          this.restartCooldown = 0.5;
-          this.restartCurrentLevel();
-        }
-      } else {
-        this.restartCooldown = 0;
       }
 
       updateRoll(speed);

@@ -8,7 +8,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:3002",
+      "/g/heavy-ball/api": {
+        target: "http://localhost:3002",
+        rewrite: (path) => path.replace(/^\/g\/heavy-ball/, ""),
+      },
     },
   },
 });

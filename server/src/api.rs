@@ -1,11 +1,19 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use crate::db::Db;
 use crate::models::*;
+
+/// Extract and validate auth token from Authorization header.
+fn authenticate(req: &HttpRequest, db: &Db) -> Option<i64> {
+    let header = req.headers().get("authorization")?.to_str().ok()?;
+    let token = header.strip_prefix("Bearer ")?;
+    db.validate_auth_token(token).ok()?
+}
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
             .route("/alias", web::post().to(post_alias))
+            .route("/wallet", web::post().to(post_wallet))
             .route("/scores", web::post().to(post_score))
             .route("/scores/top", web::get().to(get_top_scores))
             .route("/stats/player/{id}", web::get().to(get_player_stats))
@@ -18,13 +26,44 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
 async fn post_alias(db: web::Data<Db>, body: web::Json<AliasRequest>) -> HttpResponse {
     match db.upsert_alias(&body.alias) {
-        Ok((id, alias)) => HttpResponse::Ok().json(PlayerResponse { id, alias }),
+        Ok((id, alias)) => HttpResponse::Ok().json(PlayerResponse {
+            id, alias, wallet_address: None, network_id: None, auth_token: None,
+        }),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
 }
 
-async fn post_score(db: web::Data<Db>, body: web::Json<ScoreSubmission>) -> HttpResponse {
-    match db.insert_score(
+async fn post_wallet(db: web::Data<Db>, body: web::Json<WalletRequest>) -> HttpResponse {
+    let wallet_address = body.wallet_address.trim();
+    if wallet_address.is_empty() {
+        return HttpResponse::BadRequest().body("wallet_address is required");
+    }
+    let network_id = if body.network_id.is_empty() { "preview" } else { &body.network_id };
+
+    match db.upsert_wallet(wallet_address, network_id) {
+        Ok((id, alias, wallet, net)) => {
+            let auth_token = db.create_auth_token(id).unwrap_or_default();
+            HttpResponse::Ok().json(PlayerResponse {
+                id,
+                alias,
+                wallet_address: wallet,
+                network_id: Some(net),
+                auth_token: Some(auth_token),
+            })
+        },
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+async fn post_score(req: HttpRequest, db: web::Data<Db>, body: web::Json<ScoreSubmission>) -> HttpResponse {
+    // Auth is optional for backward compatibility — alias-based players have no token
+    if let Some(pid) = authenticate(&req, &db) {
+        if pid != body.player_id {
+            return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" }));
+        }
+    }
+
+    match db.upsert_score(
         body.player_id, body.level, body.time_ms,
         body.boxes_broken, body.power_ups_collected,
     ) {
@@ -38,8 +77,9 @@ async fn get_top_scores(db: web::Data<Db>, query: web::Query<LevelQuery>) -> Htt
     let limit = query.limit.unwrap_or(20).min(100);
     match db.top_scores(level, limit) {
         Ok(rows) => {
-            let entries: Vec<ScoreEntry> = rows.into_iter().enumerate().map(|(i, (alias, time_ms, pid))| {
-                ScoreEntry { rank: (i + 1) as i64, alias, time_ms, player_id: pid }
+            let entries: Vec<ScoreEntry> = rows.into_iter().enumerate().map(|(i, (display_name, wallet_address, time_ms, pid))| {
+                let alias = display_name.clone();
+                ScoreEntry { rank: (i + 1) as i64, alias, display_name, wallet_address, time_ms, player_id: pid }
             }).collect();
             HttpResponse::Ok().json(entries)
         }
@@ -59,7 +99,14 @@ async fn get_player_stats(db: web::Data<Db>, path: web::Path<i64>) -> HttpRespon
     }
 }
 
-async fn post_achievement(db: web::Data<Db>, body: web::Json<AchievementUnlock>) -> HttpResponse {
+async fn post_achievement(req: HttpRequest, db: web::Data<Db>, body: web::Json<AchievementUnlock>) -> HttpResponse {
+    // Auth optional for backward compat
+    if let Some(pid) = authenticate(&req, &db) {
+        if pid != body.player_id {
+            return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" }));
+        }
+    }
+
     match db.unlock_achievement(body.player_id, &body.achievement_key) {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({ "status": "ok" })),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
@@ -70,8 +117,12 @@ async fn get_leaderboard(db: web::Data<Db>, query: web::Query<LeaderboardQuery>)
     let limit = query.limit.unwrap_or(20).min(100);
     match db.global_leaderboard(limit) {
         Ok(rows) => {
-            let entries: Vec<LeaderboardEntry> = rows.into_iter().enumerate().map(|(i, (alias, pid, max_level, total_time))| {
-                LeaderboardEntry { rank: (i + 1) as i64, alias, player_id: pid, max_level, total_time_ms: total_time }
+            let entries: Vec<LeaderboardEntry> = rows.into_iter().enumerate().map(|(i, (display_name, wallet_address, pid, max_level, total_time))| {
+                let alias = display_name.clone();
+                LeaderboardEntry {
+                    rank: (i + 1) as i64, alias, display_name, wallet_address,
+                    player_id: pid, max_level, total_time_ms: total_time,
+                }
             }).collect();
             HttpResponse::Ok().json(entries)
         }

@@ -5,10 +5,22 @@ pub struct AliasRequest {
     pub alias: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WalletRequest {
+    pub wallet_address: String,
+    pub network_id: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PlayerResponse {
     pub id: i64,
     pub alias: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +36,9 @@ pub struct ScoreSubmission {
 pub struct ScoreEntry {
     pub rank: i64,
     pub alias: String,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_address: Option<String>,
     pub time_ms: i64,
     pub player_id: i64,
 }
@@ -63,6 +78,9 @@ pub struct LeaderboardQuery {
 pub struct LeaderboardEntry {
     pub rank: i64,
     pub alias: String,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_address: Option<String>,
     pub player_id: i64,
     pub max_level: i64,
     pub total_time_ms: i64,

@@ -1,6 +1,6 @@
 import { PowerUpType } from "./powerups/PowerUpType";
 import { CONFIG } from "./config";
-import { api, type ScoreEntry } from "./api";
+import { api, type ScoreEntry, type LeaderboardEntry, getDisplayName } from "./api";
 
 const POWER_UP_NAMES: Record<PowerUpType, string> = {
   [PowerUpType.TimeBonus]: "Time Bonus",
@@ -42,12 +42,15 @@ export class HUD {
   private elapsedMs = 0;
   private running = false;
   private toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  private currentLevelIndex = 0;
 
-  onRestart?: () => void;
+  onGiveUp?: () => void;
   onStart?: () => void;
   onNextLevel?: () => void;
   onLevelSelect?: (index: number) => void;
   onAliasSubmit?: (alias: string) => void;
+  onWalletConnect?: () => void;
+  onWalletDisconnect?: () => void;
 
   constructor() {
     this.levelEl = document.getElementById("hud-level")!;
@@ -75,26 +78,41 @@ export class HUD {
     `;
     document.body.appendChild(this.levelSelectEl);
 
-    this.restartBtn.addEventListener("click", () => this.onRestart?.());
+    this.restartBtn.textContent = "Give Up";
+    this.restartBtn.addEventListener("click", () => this.onGiveUp?.());
     this.overlayBtns.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       if (target.id === "btn-start") this.onStart?.();
+      if (target.id === "btn-continue") {
+        const level = parseInt(target.dataset.level ?? "0");
+        this.onLevelSelect?.(level);
+      }
       if (target.id === "btn-next") this.onNextLevel?.();
-      if (target.id === "btn-replay") this.onRestart?.();
+      if (target.id === "btn-replay") this.onLevelSelect?.(this.currentLevelIndex);
       if (target.id === "btn-play-again") this.onLevelSelect?.(0);
       if (target.id === "btn-alias-submit") {
         const input = document.getElementById("alias-input") as HTMLInputElement;
         const alias = input?.value.trim();
         if (alias) this.onAliasSubmit?.(alias);
       }
+      if (target.id === "btn-wallet-connect") {
+        this.onWalletConnect?.();
+      }
+      if (target.id === "btn-wallet-disconnect") {
+        this.onWalletDisconnect?.();
+      }
       if (target.id === "btn-leaderboard") {
         this.toggleLeaderboard(parseInt(target.dataset.level ?? "1"));
+      }
+      if (target.id === "btn-highscores") {
+        this.toggleGlobalLeaderboard();
       }
     });
   }
 
-  setLevel(name: string) {
+  setLevel(name: string, index: number) {
     this.levelEl.textContent = name;
+    this.currentLevelIndex = index;
   }
 
   startTimer() {
@@ -160,13 +178,22 @@ export class HUD {
     this.powerupsEl.innerHTML = "";
   }
 
-  showAliasEntry() {
+  showAliasEntry(hasWallet = false) {
     this.overlayH1.textContent = "Heavy Ball";
-    this.overlayP.textContent = "Enter your name to play";
+    this.overlayP.textContent = hasWallet
+      ? "Connect your wallet or enter a name"
+      : "Enter your name to play";
+
+    const walletBtn = hasWallet
+      ? `<button class="overlay-btn" id="btn-wallet-connect">Connect Wallet</button>
+         <div style="opacity:0.4;font-size:13px;margin:8px 0">or</div>`
+      : "";
+
     this.overlayBtns.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+        ${walletBtn}
         <input type="text" id="alias-input" placeholder="Your name" maxlength="20" autocomplete="off" />
-        <button class="overlay-btn" id="btn-alias-submit">Play</button>
+        <button class="overlay-btn${hasWallet ? " secondary" : ""}" id="btn-alias-submit">Play</button>
       </div>
     `;
     this.overlayTime.style.display = "none";
@@ -187,10 +214,59 @@ export class HUD {
     });
   }
 
-  showStartScreen() {
+  showWalletConnecting() {
+    const btn = document.getElementById("btn-wallet-connect");
+    if (btn) {
+      btn.textContent = "Connecting...";
+      (btn as HTMLButtonElement).disabled = true;
+    }
+  }
+
+  showWalletError(message: string) {
+    const btn = document.getElementById("btn-wallet-connect");
+    if (btn) {
+      btn.textContent = "Connect Wallet";
+      (btn as HTMLButtonElement).disabled = false;
+    }
+    // Show error below buttons
+    let errorEl = document.getElementById("wallet-error");
+    if (!errorEl) {
+      errorEl = document.createElement("div");
+      errorEl.id = "wallet-error";
+      errorEl.style.cssText = "color:#ff6666;font-size:13px;margin-top:8px;text-align:center";
+      this.overlayBtns.appendChild(errorEl);
+    }
+    errorEl.textContent = message;
+  }
+
+  showStartScreen(continueLevel = 0, playerIdentifier?: string) {
     this.overlayH1.textContent = "Heavy Ball";
-    this.overlayP.textContent = "Guide the ball to the finish";
-    this.overlayBtns.innerHTML = `<button class="overlay-btn" id="btn-start">Start</button>`;
+
+    let statusText = "";
+    if (playerIdentifier) {
+      statusText = `<span style="font-size:13px;opacity:0.5">${this.escapeHtml(playerIdentifier)}</span><br>`;
+    }
+
+    if (continueLevel > 0) {
+      this.overlayP.innerHTML = `${statusText}Progress: Level ${continueLevel} completed`;
+    } else {
+      this.overlayP.innerHTML = `${statusText}Guide the ball to the finish`;
+    }
+
+    const disconnectBtn = playerIdentifier
+      ? `<button class="overlay-btn secondary" id="btn-wallet-disconnect" style="font-size:12px;padding:6px 16px">Logout</button>`
+      : "";
+
+    const btns = continueLevel > 0
+      ? `<button class="overlay-btn" id="btn-continue" data-level="${continueLevel}">Continue (Level ${continueLevel + 1})</button>
+         <button class="overlay-btn secondary" id="btn-start">New Game</button>
+         <button class="overlay-btn secondary" id="btn-highscores">High Scores</button>
+         ${disconnectBtn}`
+      : `<button class="overlay-btn" id="btn-start">Start</button>
+         <button class="overlay-btn secondary" id="btn-highscores">High Scores</button>
+         ${disconnectBtn}`;
+
+    this.overlayBtns.innerHTML = btns;
     this.overlayTime.style.display = "none";
     this.leaderboardPanel.style.display = "none";
     this.statsPanel.style.display = "none";
@@ -238,6 +314,41 @@ export class HUD {
     this.overlay.classList.remove("hidden");
   }
 
+  private async toggleGlobalLeaderboard() {
+    if (this.leaderboardPanel.style.display === "block") {
+      this.leaderboardPanel.style.display = "none";
+      return;
+    }
+
+    this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Loading...</p>";
+    this.leaderboardPanel.style.display = "block";
+
+    try {
+      const entries = await api.getLeaderboard(20);
+      if (entries.length === 0) {
+        this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>No scores yet</p>";
+        return;
+      }
+      this.leaderboardPanel.innerHTML = `
+        <table>
+          <thead><tr><th>#</th><th>Player</th><th>Level</th><th>Total Time</th></tr></thead>
+          <tbody>
+            ${entries.map((s: LeaderboardEntry) => `
+              <tr>
+                <td>${s.rank}</td>
+                <td>${this.escapeHtml(getDisplayName(s))}</td>
+                <td>${s.max_level}</td>
+                <td>${this.formatTime(s.total_time_ms)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    } catch {
+      this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.5'>Could not load leaderboard</p>";
+    }
+  }
+
   private async toggleLeaderboard(level: number) {
     if (this.leaderboardPanel.style.display === "block") {
       this.leaderboardPanel.style.display = "none";
@@ -260,7 +371,7 @@ export class HUD {
             ${scores.map((s: ScoreEntry) => `
               <tr>
                 <td>${s.rank}</td>
-                <td>${this.escapeHtml(s.alias)}</td>
+                <td>${this.escapeHtml(getDisplayName(s))}</td>
                 <td>${this.formatTime(s.time_ms)}</td>
               </tr>
             `).join("")}
