@@ -23,6 +23,14 @@ export interface RunData {
   time_ms: number;
   boxes_broken: number;
   power_ups_collected: number;
+  fall_count: number;
+  speed_boosts: number;
+}
+
+export interface ScoreResult {
+  id: number;
+  achievements_unlocked: string[];
+  achievements_display: string[];
 }
 
 export interface AchievementEntry {
@@ -93,26 +101,17 @@ export function getDisplayName(entry: { alias?: string; display_name?: string; w
 }
 
 export const api = {
-  registerAlias: (alias: string) =>
-    post<PlayerData>("/api/alias", { alias }),
-
   registerWallet: (walletAddress: string, networkId: string) =>
     post<PlayerData>("/api/wallet", { wallet_address: walletAddress, network_id: networkId }),
 
   submitScore: (data: RunData) =>
-    post<{ id: number }>("/api/scores", data),
+    post<ScoreResult>("/api/scores", data),
 
   getTopScores: (level: number, limit = 20) =>
     get<ScoreEntry[]>(`/api/scores/top?level=${level}&limit=${limit}`),
 
   getPlayerStats: (playerId: number) =>
     get<PlayerStatsData>(`/api/stats/player/${playerId}`),
-
-  unlockAchievement: (playerId: number, achievementKey: string) =>
-    post<{ status: string }>("/api/achievements", {
-      player_id: playerId,
-      achievement_key: achievementKey,
-    }),
 
   getPlayerAchievements: (playerId: number) =>
     get<AchievementEntry[]>(`/api/achievements/${playerId}`),

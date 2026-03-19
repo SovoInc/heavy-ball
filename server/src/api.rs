@@ -1,8 +1,10 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use crate::db::Db;
 use crate::models::*;
+use crate::achievement_eval;
 
 /// Extract and validate auth token from Authorization header.
+/// Returns the authenticated player_id, or None if invalid/missing.
 fn authenticate(req: &HttpRequest, db: &Db) -> Option<i64> {
     let header = req.headers().get("authorization")?.to_str().ok()?;
     let token = header.strip_prefix("Bearer ")?;
@@ -12,25 +14,14 @@ fn authenticate(req: &HttpRequest, db: &Db) -> Option<i64> {
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
-            .route("/alias", web::post().to(post_alias))
             .route("/wallet", web::post().to(post_wallet))
             .route("/scores", web::post().to(post_score))
             .route("/scores/top", web::get().to(get_top_scores))
             .route("/stats/player/{id}", web::get().to(get_player_stats))
-            .route("/achievements", web::post().to(post_achievement))
             .route("/achievements/{player_id}", web::get().to(get_achievements))
             .route("/leaderboard", web::get().to(get_leaderboard))
             .route("/progress/{player_id}", web::get().to(get_progress)),
     );
-}
-
-async fn post_alias(db: web::Data<Db>, body: web::Json<AliasRequest>) -> HttpResponse {
-    match db.upsert_alias(&body.alias) {
-        Ok((id, alias)) => HttpResponse::Ok().json(PlayerResponse {
-            id, alias, wallet_address: None, network_id: None, auth_token: None,
-        }),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
 }
 
 async fn post_wallet(db: web::Data<Db>, body: web::Json<WalletRequest>) -> HttpResponse {
@@ -56,20 +47,37 @@ async fn post_wallet(db: web::Data<Db>, body: web::Json<WalletRequest>) -> HttpR
 }
 
 async fn post_score(req: HttpRequest, db: web::Data<Db>, body: web::Json<ScoreSubmission>) -> HttpResponse {
-    // Auth is optional for backward compatibility — alias-based players have no token
-    if let Some(pid) = authenticate(&req, &db) {
-        if pid != body.player_id {
-            return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" }));
-        }
+    match authenticate(&req, &db) {
+        Some(pid) if pid == body.player_id => {},
+        _ => return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" })),
     }
 
-    match db.upsert_score(
+    // 1. Insert/update score
+    let score_id = match db.upsert_score(
         body.player_id, body.level, body.time_ms,
         body.boxes_broken, body.power_ups_collected,
+        body.fall_count, body.speed_boosts,
     ) {
-        Ok(id) => HttpResponse::Ok().json(serde_json::json!({ "id": id })),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
+        Ok(id) => id,
+        Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
+    };
+
+    // 2. Evaluate achievements server-side
+    let run_input = achievement_eval::RunInput {
+        level: body.level,
+        time_ms: body.time_ms,
+        boxes_broken: body.boxes_broken,
+        power_ups_collected: body.power_ups_collected,
+        fall_count: body.fall_count,
+        speed_boosts: body.speed_boosts,
+    };
+    let achievements = achievement_eval::evaluate_achievements(&db, body.player_id, &run_input);
+
+    HttpResponse::Ok().json(ScoreResult {
+        id: score_id,
+        achievements_unlocked: achievements.iter().map(|(k, _)| k.clone()).collect(),
+        achievements_display: achievements.iter().map(|(_, d)| d.clone()).collect(),
+    })
 }
 
 async fn get_top_scores(db: web::Data<Db>, query: web::Query<LevelQuery>) -> HttpResponse {
@@ -87,28 +95,18 @@ async fn get_top_scores(db: web::Data<Db>, query: web::Query<LevelQuery>) -> Htt
     }
 }
 
-async fn get_player_stats(db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
+async fn get_player_stats(req: HttpRequest, db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
     let player_id = path.into_inner();
+    match authenticate(&req, &db) {
+        Some(pid) if pid == player_id => {},
+        _ => return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" })),
+    }
     match db.player_stats(player_id) {
         Ok((total_runs, total_boxes_broken, total_power_ups, levels_completed)) => {
             HttpResponse::Ok().json(PlayerStats {
                 total_runs, total_boxes_broken, total_power_ups, levels_completed,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
-}
-
-async fn post_achievement(req: HttpRequest, db: web::Data<Db>, body: web::Json<AchievementUnlock>) -> HttpResponse {
-    // Auth optional for backward compat
-    if let Some(pid) = authenticate(&req, &db) {
-        if pid != body.player_id {
-            return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" }));
-        }
-    }
-
-    match db.unlock_achievement(body.player_id, &body.achievement_key) {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({ "status": "ok" })),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
 }
@@ -130,8 +128,12 @@ async fn get_leaderboard(db: web::Data<Db>, query: web::Query<LeaderboardQuery>)
     }
 }
 
-async fn get_progress(db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
+async fn get_progress(req: HttpRequest, db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
     let player_id = path.into_inner();
+    match authenticate(&req, &db) {
+        Some(pid) if pid == player_id => {},
+        _ => return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" })),
+    }
     match db.player_progress(player_id) {
         Ok((max_level, total_time_ms)) => {
             HttpResponse::Ok().json(PlayerProgress { max_level, total_time_ms })
@@ -140,8 +142,12 @@ async fn get_progress(db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
     }
 }
 
-async fn get_achievements(db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
+async fn get_achievements(req: HttpRequest, db: web::Data<Db>, path: web::Path<i64>) -> HttpResponse {
     let player_id = path.into_inner();
+    match authenticate(&req, &db) {
+        Some(pid) if pid == player_id => {},
+        _ => return HttpResponse::Unauthorized().json(serde_json::json!({ "error": "unauthorized" })),
+    }
     match db.player_achievements(player_id) {
         Ok(rows) => {
             let entries: Vec<AchievementRecord> = rows.into_iter().map(|(key, at)| {

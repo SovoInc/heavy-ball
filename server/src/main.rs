@@ -1,4 +1,5 @@
 mod achievement_defs;
+mod achievement_eval;
 mod api;
 mod db;
 mod models;

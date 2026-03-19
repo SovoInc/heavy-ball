@@ -34,6 +34,8 @@ impl Db {
                 time_ms INTEGER NOT NULL,
                 boxes_broken INTEGER NOT NULL DEFAULT 0,
                 power_ups_collected INTEGER NOT NULL DEFAULT 0,
+                fall_count INTEGER NOT NULL DEFAULT 0,
+                speed_boosts INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -56,22 +58,17 @@ impl Db {
             CREATE INDEX IF NOT EXISTS idx_achievements_player ON achievements(player_id);
             ",
         )?;
-        Ok(())
-    }
 
-    pub fn upsert_alias(&self, alias: &str) -> Result<(i64, String)> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT OR IGNORE INTO players (alias) VALUES (?1)",
-            params![alias],
-        )?;
-        let mut stmt = conn.prepare(
-            "SELECT id, alias FROM players WHERE alias = ?1",
-        )?;
-        let row = stmt.query_row(params![alias], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
-        Ok(row)
+        // Migration: add fall_count, speed_boosts columns
+        let has_fall_count: bool = conn.prepare("SELECT fall_count FROM scores LIMIT 0").is_ok();
+        if !has_fall_count {
+            conn.execute_batch(
+                "ALTER TABLE scores ADD COLUMN fall_count INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE scores ADD COLUMN speed_boosts INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+
+        Ok(())
     }
 
     pub fn upsert_wallet(&self, wallet_address: &str, network_id: &str) -> Result<(i64, String, Option<String>, String)> {
@@ -81,7 +78,6 @@ impl Db {
             "INSERT OR IGNORE INTO players (alias, wallet_address, network_id) VALUES (?1, ?2, ?3)",
             params![alias, wallet_address, network_id],
         )?;
-        // Update network_id if wallet already existed
         conn.execute(
             "UPDATE players SET network_id = ?2 WHERE wallet_address = ?1",
             params![wallet_address, network_id],
@@ -122,9 +118,9 @@ impl Db {
     pub fn upsert_score(
         &self, player_id: i64, level: i64, time_ms: i64,
         boxes_broken: i64, power_ups_collected: i64,
+        fall_count: i64, speed_boosts: i64,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
-        // Check if player already has a score for this level
         let existing: Option<(i64, i64)> = conn.prepare(
             "SELECT id, time_ms FROM scores WHERE player_id = ?1 AND level = ?2",
         )?.query_row(params![player_id, level], |row| {
@@ -134,20 +130,40 @@ impl Db {
         match existing {
             Some((id, old_time)) if time_ms < old_time => {
                 conn.execute(
-                    "UPDATE scores SET time_ms = ?1, boxes_broken = ?2, power_ups_collected = ?3 WHERE id = ?4",
-                    params![time_ms, boxes_broken, power_ups_collected, id],
+                    "UPDATE scores SET time_ms=?1, boxes_broken=?2, power_ups_collected=?3, fall_count=?4, speed_boosts=?5 WHERE id=?6",
+                    params![time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, id],
                 )?;
                 Ok(id)
             }
-            Some((id, _)) => Ok(id), // existing score is better, keep it
+            Some((id, _)) => Ok(id),
             None => {
                 conn.execute(
-                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected) VALUES (?1,?2,?3,?4,?5)",
-                    params![player_id, level, time_ms, boxes_broken, power_ups_collected],
+                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+                    params![player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts],
                 )?;
                 Ok(conn.last_insert_rowid())
             }
         }
+    }
+
+    /// Sum a numeric column across all of a player's scores.
+    pub fn player_aggregate(&self, player_id: i64, column: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let sql = format!(
+            "SELECT COALESCE(SUM({col}), 0) FROM scores WHERE player_id = ?1",
+            col = column,
+        );
+        conn.query_row(&sql, params![player_id], |r| r.get(0))
+    }
+
+    /// Count distinct levels completed by a player.
+    pub fn player_levels_completed(&self, player_id: i64) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COUNT(DISTINCT level) FROM scores WHERE player_id = ?1",
+            params![player_id],
+            |r| r.get(0),
+        )
     }
 
     pub fn top_scores(&self, level: i64, limit: i64) -> Result<Vec<(String, Option<String>, i64, i64)>> {

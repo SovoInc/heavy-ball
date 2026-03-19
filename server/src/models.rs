@@ -1,11 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
-pub struct AliasRequest {
-    pub alias: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct WalletRequest {
     pub wallet_address: String,
     pub network_id: String,
@@ -30,6 +25,15 @@ pub struct ScoreSubmission {
     pub time_ms: i64,
     pub boxes_broken: i64,
     pub power_ups_collected: i64,
+    pub fall_count: i64,
+    pub speed_boosts: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ScoreResult {
+    pub id: i64,
+    pub achievements_unlocked: Vec<String>,
+    pub achievements_display: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -49,12 +53,6 @@ pub struct PlayerStats {
     pub total_boxes_broken: i64,
     pub total_power_ups: i64,
     pub levels_completed: i64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AchievementUnlock {
-    pub player_id: i64,
-    pub achievement_key: String,
 }
 
 #[derive(Debug, Serialize)]

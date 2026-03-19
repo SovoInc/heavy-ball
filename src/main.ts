@@ -30,14 +30,9 @@ class Game {
   private lastTime = 0;
   private screenShake = 0;
   private fallCount = 0;
+  private speedBoosts = 0;
   private currentBallScale = 1;
   private player: PlayerState | null = null;
-
-  // Cumulative stats for achievement tracking
-  private totalBoxesBroken = 0;
-  private totalPowerUpsCollected = 0;
-  private totalSpeedBoosts = 0;
-  private completedLevels = new Set<number>();
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -114,7 +109,7 @@ class Game {
 
     this.powerUpManager.onActivated = (type) => {
       playPowerUp();
-      if (type === PowerUpType.SpeedBoost) this.totalSpeedBoosts++;
+      if (type === PowerUpType.SpeedBoost) this.speedBoosts++;
       if (type !== PowerUpType.TimeBonus) {
         const names: Record<string, string> = {
           [PowerUpType.SpeedBoost]: "Speed Boost!",
@@ -160,10 +155,6 @@ class Game {
       clearPlayer();
       setAuthToken("");
       this.player = null;
-      this.totalBoxesBroken = 0;
-      this.totalPowerUpsCollected = 0;
-      this.totalSpeedBoosts = 0;
-      this.completedLevels.clear();
       this.hud.showWalletLogin();
     };
 
@@ -202,6 +193,7 @@ class Game {
   private onLevelStart() {
     this.state = "playing";
     this.fallCount = 0;
+    this.speedBoosts = 0;
     this.powerUpManager.reset();
     this.ball.resetScale();
     this.currentBallScale = 1;
@@ -233,52 +225,11 @@ class Game {
         time_ms: Math.round(timeMs),
         boxes_broken: level?.boxesBroken ?? 0,
         power_ups_collected: level?.powerUpsCollected ?? 0,
+        fall_count: this.fallCount,
+        speed_boosts: this.speedBoosts,
       });
     } catch {
       // Silently fail if server is down
-    }
-
-    // Track cumulative stats
-    this.totalBoxesBroken += level?.boxesBroken ?? 0;
-    this.totalPowerUpsCollected += level?.powerUpsCollected ?? 0;
-    this.completedLevels.add(levelNumber);
-
-    // Check achievements
-    this.checkAchievements(timeMs);
-  }
-
-  private async checkAchievements(timeMs: number) {
-    if (!this.player || this.player.id === 0) return;
-
-    const unlocks: string[] = [];
-
-    // first_finish
-    unlocks.push("first_finish");
-
-    // speed_demon - under 30 seconds
-    if (timeMs < 30000) unlocks.push("speed_demon");
-
-    // box_smasher - 50 total
-    if (this.totalBoxesBroken >= 50) unlocks.push("box_smasher");
-
-    // power_collector - 25 total
-    if (this.totalPowerUpsCollected >= 25) unlocks.push("power_collector");
-
-    // completionist - all 100 levels
-    if (this.completedLevels.size >= 100) unlocks.push("completionist");
-
-    // no_fall
-    if (this.fallCount === 0) unlocks.push("no_fall");
-
-    // speedster - 10 speed boosts
-    if (this.totalSpeedBoosts >= 10) unlocks.push("speedster");
-
-    for (const key of unlocks) {
-      try {
-        await api.unlockAchievement(this.player.id, key);
-      } catch {
-        // Silently fail
-      }
     }
   }
 
