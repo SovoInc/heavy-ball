@@ -1,11 +1,13 @@
 import * as CANNON from "cannon-es";
 import { CONFIG } from "./config";
 import type { Ball } from "./objects/Ball";
+import type { ElementalBuildup } from "./elemental/ElementalBuildup";
 
 export class Controls {
   private keys = new Set<string>();
   private enabled = true;
   speedMultiplier = 1;
+  elementalBuildup: ElementalBuildup | null = null;
 
   // Virtual joystick state
   private joystickEl: HTMLElement | null = null;
@@ -200,6 +202,7 @@ export class Controls {
       const maxSpeed = CONFIG.ball.maxSpeed * this.speedMultiplier;
       const speedRatio = Math.max(0, 1 - speed / maxSpeed);
       force.scale(speedRatio * this.speedMultiplier, force);
+      this.elementalBuildup?.modifyForce(force);
       ball.body.wakeUp();
       ball.body.applyForce(force);
     }

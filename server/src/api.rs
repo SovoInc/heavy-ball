@@ -57,6 +57,7 @@ async fn post_score(req: HttpRequest, db: web::Data<Db>, body: web::Json<ScoreSu
         body.player_id, body.level, body.time_ms,
         body.boxes_broken, body.power_ups_collected,
         body.fall_count, body.speed_boosts,
+        body.fire_maxed, body.ice_maxed,
     ) {
         Ok(id) => id,
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
@@ -70,6 +71,8 @@ async fn post_score(req: HttpRequest, db: web::Data<Db>, body: web::Json<ScoreSu
         power_ups_collected: body.power_ups_collected,
         fall_count: body.fall_count,
         speed_boosts: body.speed_boosts,
+        fire_maxed: body.fire_maxed,
+        ice_maxed: body.ice_maxed,
     };
     let achievements = achievement_eval::evaluate_achievements(&db, body.player_id, &run_input);
 

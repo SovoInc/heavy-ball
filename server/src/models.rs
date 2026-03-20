@@ -27,6 +27,10 @@ pub struct ScoreSubmission {
     pub power_ups_collected: i64,
     pub fall_count: i64,
     pub speed_boosts: i64,
+    #[serde(default)]
+    pub fire_maxed: bool,
+    #[serde(default)]
+    pub ice_maxed: bool,
 }
 
 #[derive(Debug, Serialize)]

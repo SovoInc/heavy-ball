@@ -1,6 +1,18 @@
 import { PowerUpType } from "./powerups/PowerUpType";
 import { CONFIG } from "./config";
-import { api, type ScoreEntry, type LeaderboardEntry, getDisplayName } from "./api";
+import { api, type ScoreEntry, type LeaderboardEntry, type AchievementEntry, getDisplayName } from "./api";
+
+const ACHIEVEMENT_DEFS: Record<string, { name: string; desc: string; icon: string }> = {
+  first_finish:   { name: "First Finish",    desc: "Complete any level",                  icon: "\u{1F3C1}" },
+  speed_demon:    { name: "Speed Demon",     desc: "Complete a level under 30 seconds",   icon: "\u{26A1}" },
+  box_smasher:    { name: "Box Smasher",     desc: "Break 50 boxes total",                icon: "\u{1F4E6}" },
+  power_collector:{ name: "Power Collector",  desc: "Collect 25 power-ups total",          icon: "\u{2B50}" },
+  completionist:  { name: "Completionist",   desc: "Complete all 100 levels",             icon: "\u{1F3C6}" },
+  no_fall:        { name: "No Fall",          desc: "Complete a level without falling",    icon: "\u{1F3AF}" },
+  speedster:      { name: "Speedster",        desc: "Use 10 speed boosts total",           icon: "\u{1F680}" },
+  fire_maxed:     { name: "Overheated",       desc: "Reach maximum fire buildup",          icon: "\u{1F525}" },
+  ice_maxed:      { name: "Frozen Solid",     desc: "Get completely frozen by ice",        icon: "\u{2744}\u{FE0F}" },
+};
 
 const POWER_UP_NAMES: Record<PowerUpType, string> = {
   [PowerUpType.TimeBonus]: "Time Bonus",
@@ -39,6 +51,17 @@ export class HUD {
   private leaderboardPanel: HTMLElement;
   private statsPanel: HTMLElement;
   private levelSelectEl: HTMLElement;
+  private fireBarContainer: HTMLElement;
+  private fireBarFill: HTMLElement;
+  private iceBarContainer: HTMLElement;
+  private iceBarFill: HTMLElement;
+  private fireOverlay: HTMLElement;
+  private iceOverlay: HTMLElement;
+  private achievementsPanel: HTMLElement;
+  private achievementToast: HTMLElement;
+  private achievementToastIcon: HTMLElement;
+  private achievementToastName: HTMLElement;
+  private achievementToastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private elapsedMs = 0;
   private running = false;
@@ -67,6 +90,16 @@ export class HUD {
     this.toastEl = document.getElementById("hud-toast")!;
     this.leaderboardPanel = document.getElementById("leaderboard-panel")!;
     this.statsPanel = document.getElementById("stats-panel")!;
+    this.fireBarContainer = document.getElementById("fire-bar-container")!;
+    this.fireBarFill = document.getElementById("fire-bar-fill")!;
+    this.iceBarContainer = document.getElementById("ice-bar-container")!;
+    this.iceBarFill = document.getElementById("ice-bar-fill")!;
+    this.fireOverlay = document.getElementById("fire-overlay")!;
+    this.iceOverlay = document.getElementById("ice-overlay")!;
+    this.achievementsPanel = document.getElementById("achievements-panel")!;
+    this.achievementToast = document.getElementById("achievement-toast")!;
+    this.achievementToastIcon = this.achievementToast.querySelector(".toast-icon")!;
+    this.achievementToastName = this.achievementToast.querySelector(".toast-name")!;
 
     // Create level select popup
     this.levelSelectEl = document.createElement("div");
@@ -107,12 +140,19 @@ export class HUD {
       if (target.id === "btn-leaderboard-back") {
         this.hideLeaderboardView();
       }
+      if (target.id === "btn-achievements") {
+        this.toggleAchievements(parseInt(target.dataset.playerId ?? "0"));
+      }
+      if (target.id === "btn-achievements-back") {
+        this.hideAchievementsView();
+      }
     });
   }
 
   private resetOverlay() {
     this.overlayTime.style.display = "none";
     this.leaderboardPanel.style.display = "none";
+    this.achievementsPanel.style.display = "none";
     this.statsPanel.style.display = "none";
     // Clean up dynamic elements (badges, errors)
     this.overlayContent.querySelectorAll(".player-badge, .wallet-error").forEach(el => el.remove());
@@ -190,6 +230,25 @@ export class HUD {
     this.powerupsEl.innerHTML = "";
   }
 
+  updateElementalBuildup(fire: number, ice: number) {
+    const fireVisible = fire > 0.01;
+    const iceVisible = ice > 0.01;
+
+    this.fireBarContainer.classList.toggle("visible", fireVisible);
+    this.iceBarContainer.classList.toggle("visible", iceVisible);
+
+    if (fireVisible) {
+      this.fireBarFill.style.width = `${fire * 100}%`;
+    }
+    if (iceVisible) {
+      this.iceBarFill.style.width = `${ice * 100}%`;
+    }
+
+    // Screen vignette overlays
+    this.fireOverlay.style.opacity = fire > 0.1 ? String(fire * 0.8) : "0";
+    this.iceOverlay.style.opacity = ice > 0.1 ? String(ice * 0.8) : "0";
+  }
+
   showWalletLogin() {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
@@ -224,7 +283,7 @@ export class HUD {
     errorEl.textContent = message;
   }
 
-  showStartScreen(continueLevel = 0, playerIdentifier?: string) {
+  showStartScreen(continueLevel = 0, playerIdentifier?: string, playerId = 0) {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
 
@@ -247,17 +306,23 @@ export class HUD {
       ? `<button class="overlay-btn danger" id="btn-wallet-disconnect">Sign out</button>`
       : "";
 
+    const achievementsBtn = playerId > 0
+      ? `<button class="overlay-btn secondary" id="btn-achievements" data-player-id="${playerId}">Achievements</button>`
+      : "";
+
     if (continueLevel > 0) {
       this.overlayBtns.innerHTML = `
         <button class="overlay-btn primary" id="btn-continue" data-level="${continueLevel}">Continue &mdash; Level ${continueLevel + 1}</button>
         <button class="overlay-btn secondary" id="btn-start">New Game</button>
         <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${achievementsBtn}
         ${logoutBtn}
       `;
     } else {
       this.overlayBtns.innerHTML = `
         <button class="overlay-btn primary" id="btn-start">Play</button>
         <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${achievementsBtn}
         ${logoutBtn}
       `;
     }
@@ -336,6 +401,94 @@ export class HUD {
       }
       this.savedMenuState = null;
     }
+  }
+
+  private showAchievementsView() {
+    const badges: string[] = [];
+    this.overlayContent.querySelectorAll(".player-badge").forEach(el => {
+      badges.push(el.outerHTML);
+      el.remove();
+    });
+    this.savedMenuState = {
+      buttons: this.overlayBtns.innerHTML,
+      title: this.overlayH1.textContent ?? "",
+      subtitle: this.overlaySubtitle.innerHTML,
+      badges: badges.join(""),
+    };
+    this.overlayBtns.innerHTML = `
+      <button class="overlay-btn secondary" id="btn-achievements-back">Back</button>
+    `;
+    this.overlayH1.textContent = "Achievements";
+    this.overlaySubtitle.textContent = "";
+    this.achievementsPanel.style.display = "block";
+  }
+
+  private hideAchievementsView() {
+    this.achievementsPanel.style.display = "none";
+    if (this.savedMenuState) {
+      this.overlayH1.textContent = this.savedMenuState.title;
+      this.overlaySubtitle.innerHTML = this.savedMenuState.subtitle;
+      this.overlayBtns.innerHTML = this.savedMenuState.buttons;
+      if (this.savedMenuState.badges) {
+        this.overlaySubtitle.insertAdjacentHTML("beforebegin", this.savedMenuState.badges);
+      }
+      this.savedMenuState = null;
+    }
+  }
+
+  private async toggleAchievements(playerId: number) {
+    if (this.achievementsPanel.style.display === "block") {
+      this.hideAchievementsView();
+      return;
+    }
+
+    this.achievementsPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Loading...</p>";
+    this.showAchievementsView();
+
+    let unlocked: Set<string>;
+    try {
+      const entries = await api.getPlayerAchievements(playerId);
+      unlocked = new Set(entries.map((e: AchievementEntry) => e.achievement_key));
+    } catch {
+      this.achievementsPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Could not load</p>";
+      return;
+    }
+
+    const allKeys = Object.keys(ACHIEVEMENT_DEFS);
+    this.achievementsPanel.innerHTML = allKeys.map(key => {
+      const def = ACHIEVEMENT_DEFS[key];
+      const isUnlocked = unlocked.has(key);
+      return `
+        <div class="achievement-item ${isUnlocked ? "unlocked" : "locked"}">
+          <div class="achievement-icon">${def.icon}</div>
+          <div class="achievement-info">
+            <div class="achievement-name">${this.escapeHtml(def.name)}</div>
+            <div class="achievement-desc">${this.escapeHtml(def.desc)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  showAchievementUnlocked(keys: string[], displayNames: string[]) {
+    const queue = keys.map((key, i) => ({
+      icon: ACHIEVEMENT_DEFS[key]?.icon ?? "\u{1F3C6}",
+      name: displayNames[i] ?? ACHIEVEMENT_DEFS[key]?.name ?? key,
+    }));
+    let index = 0;
+    const showNext = () => {
+      if (index >= queue.length) return;
+      const item = queue[index++];
+      this.achievementToastIcon.textContent = item.icon;
+      this.achievementToastName.textContent = item.name;
+      this.achievementToast.classList.add("show");
+      if (this.achievementToastTimeout) clearTimeout(this.achievementToastTimeout);
+      this.achievementToastTimeout = setTimeout(() => {
+        this.achievementToast.classList.remove("show");
+        setTimeout(showNext, 400);
+      }, 3000);
+    };
+    showNext();
   }
 
   private async toggleGlobalLeaderboard() {

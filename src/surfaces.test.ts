@@ -468,7 +468,7 @@ describe("Speed (conveyor) surface crossability", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Lava surface — ball can cross if fast enough (before damage timer)
+// Lava surface — ball can cross (elemental buildup, no longer kills)
 // ---------------------------------------------------------------------------
 
 describe("Lava surface crossability", () => {
@@ -478,15 +478,12 @@ describe("Lava surface crossability", () => {
   beforeEach(() => {
     physics = new Physics();
     ball = createBall(physics);
-    // Lava uses groundMaterial for physics. Use a realistic lava segment size.
-    // Actual levels use lava segments of ~6-8 units long
     createPlatform(physics, physics.groundMaterial, 0, 0, 0, 6, 0.5, 8);
     ball.position.set(0, CONFIG.ball.radius, 4);
     stepSeconds(physics, 0.2);
   });
 
-  it("ball with running start can cross lava before damage timer", () => {
-    // Give ball initial speed (entering lava from normal platform)
+  it("ball with running start can cross lava", () => {
     ball.velocity.set(0, 0, -CONFIG.ball.maxSpeed * 0.7);
     const keys = new Set(["KeyW"]);
     let timeElapsed = 0;
@@ -496,19 +493,11 @@ describe("Lava surface crossability", () => {
       physics.step(CONFIG.physics.fixedTimeStep);
       timeElapsed += CONFIG.physics.fixedTimeStep;
 
-      // Check if ball has crossed the platform (passed z = -4)
       if (ball.position.z < -4) break;
     }
 
-    expect(timeElapsed).toBeLessThan(CONFIG.surfaces.lava.damageTime);
-  });
-
-  it("ball at half max speed can theoretically cross within lava damage time", () => {
-    const crossingSpeed = CONFIG.ball.maxSpeed * 0.5;
-    // Max lava length crossable: speed * damageTime
-    const maxCrossableLength = crossingSpeed * CONFIG.surfaces.lava.damageTime;
-    // Lava segments in levels should be shorter than this
-    expect(maxCrossableLength).toBeGreaterThan(8);
+    // Ball should cross lava in reasonable time
+    expect(timeElapsed).toBeLessThan(5);
   });
 
   it("ball rolling at full speed crosses lava quickly", () => {
@@ -522,8 +511,7 @@ describe("Lava surface crossability", () => {
       if (ball.position.z < -4) break;
     }
 
-    // At max speed (14), 8 units takes ~0.57s, well within 1.5s damage time
-    expect(timeOnPlatform).toBeLessThan(CONFIG.surfaces.lava.damageTime);
+    expect(timeOnPlatform).toBeLessThan(2);
   });
 });
 

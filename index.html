@@ -283,6 +283,88 @@
         margin-top: 12px; text-align: center;
       }
 
+      /* ── Achievements Panel ── */
+      #achievements-panel {
+        display: none;
+        max-height: 300px; overflow-y: auto;
+        margin-top: 16px; width: 100%;
+        background: rgba(0,0,0,0.2);
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 12px;
+      }
+      #achievements-panel::-webkit-scrollbar { width: 4px; }
+      #achievements-panel::-webkit-scrollbar-track { background: transparent; }
+      #achievements-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+      .achievement-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        transition: background 0.15s;
+      }
+      .achievement-item:last-child { margin-bottom: 0; }
+      .achievement-item.unlocked {
+        background: rgba(255,255,255,0.04);
+      }
+      .achievement-item.locked {
+        opacity: 0.35;
+      }
+      .achievement-icon {
+        font-size: 20px;
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.06);
+        flex-shrink: 0;
+      }
+      .achievement-item.unlocked .achievement-icon {
+        background: rgba(100,200,120,0.15);
+      }
+      .achievement-info {
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      .achievement-name {
+        font-size: 13px; font-weight: 600;
+        color: rgba(220,230,240,0.9);
+      }
+      .achievement-desc {
+        font-size: 11px;
+        color: rgba(200,210,220,0.5);
+      }
+
+      /* ── Achievement Unlock Toast ── */
+      #achievement-toast {
+        position: fixed; top: 20px; left: 50%;
+        transform: translateX(-50%) translateY(-100px);
+        background: rgba(10,10,20,0.92);
+        border: 1px solid rgba(100,200,120,0.3);
+        border-radius: 12px;
+        padding: 12px 24px;
+        display: flex; align-items: center; gap: 12px;
+        z-index: 100;
+        backdrop-filter: blur(20px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(100,200,120,0.1);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+      }
+      #achievement-toast.show {
+        transform: translateX(-50%) translateY(0);
+      }
+      #achievement-toast .toast-icon { font-size: 20px; }
+      #achievement-toast .toast-text {
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      #achievement-toast .toast-label {
+        font-size: 10px; font-weight: 600;
+        letter-spacing: 1px; text-transform: uppercase;
+        color: rgba(100,200,120,0.8);
+      }
+      #achievement-toast .toast-name {
+        font-size: 14px; font-weight: 700;
+        color: rgba(230,240,250,0.95);
+      }
+
       /* Error message */
       .wallet-error {
         color: #ff6b6b; font-size: 12px;
@@ -308,6 +390,48 @@
       .powerup-bar-fill {
         height: 100%; border-radius: 2px;
         transition: width 0.1s linear;
+      }
+
+      /* ── Elemental Buildup Bars ── */
+      #hud-elemental {
+        position: absolute; bottom: 24px; right: 24px;
+        display: flex; flex-direction: column; gap: 6px;
+        pointer-events: none;
+      }
+      .elemental-bar-container {
+        display: flex; align-items: center; gap: 8px;
+        opacity: 0; transition: opacity 0.3s;
+      }
+      .elemental-bar-container.visible { opacity: 1; }
+      .elemental-bar-label {
+        font-size: 11px; font-weight: 700;
+        letter-spacing: 1px; text-transform: uppercase;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+        min-width: 32px; text-align: right;
+      }
+      .elemental-bar {
+        width: 80px; height: 6px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 3px; overflow: hidden;
+      }
+      .elemental-bar-fill {
+        height: 100%; border-radius: 3px;
+        transition: width 0.1s linear;
+      }
+
+      /* ── Screen Overlays ── */
+      #fire-overlay, #ice-overlay {
+        position: fixed; inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 5;
+      }
+      #fire-overlay {
+        background: radial-gradient(ellipse at center, transparent 40%, rgba(255,60,0,0.35) 100%);
+      }
+      #ice-overlay {
+        background: radial-gradient(ellipse at center, transparent 40%, rgba(80,160,255,0.35) 100%);
       }
 
       /* ── Toast ── */
@@ -362,8 +486,24 @@
         <button id="hud-restart">Give Up</button>
       </div>
       <div id="hud-powerups"></div>
+      <div id="hud-elemental">
+        <div class="elemental-bar-container" id="fire-bar-container">
+          <span class="elemental-bar-label" style="color:#ff6633">Fire</span>
+          <div class="elemental-bar">
+            <div class="elemental-bar-fill" id="fire-bar-fill" style="width:0%;background:linear-gradient(90deg,#ff8844,#ff3300)"></div>
+          </div>
+        </div>
+        <div class="elemental-bar-container" id="ice-bar-container">
+          <span class="elemental-bar-label" style="color:#66bbff">Ice</span>
+          <div class="elemental-bar">
+            <div class="elemental-bar-fill" id="ice-bar-fill" style="width:0%;background:linear-gradient(90deg,#88ddff,#2266cc)"></div>
+          </div>
+        </div>
+      </div>
       <div id="hud-toast"></div>
     </div>
+    <div id="fire-overlay"></div>
+    <div id="ice-overlay"></div>
     <div id="overlay">
       <div id="overlay-content">
         <h1>Heavy Ball</h1>
@@ -373,7 +513,15 @@
         </div>
         <div id="overlay-time" style="display:none;"></div>
         <div id="leaderboard-panel"></div>
+        <div id="achievements-panel"></div>
         <div id="stats-panel"></div>
+      </div>
+    </div>
+    <div id="achievement-toast">
+      <span class="toast-icon"></span>
+      <div class="toast-text">
+        <span class="toast-label">Achievement Unlocked</span>
+        <span class="toast-name"></span>
       </div>
     </div>
     <div id="controls-hint">WASD / Arrow Keys to move</div>

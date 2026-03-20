@@ -209,6 +209,81 @@ export function playTeleport() {
   noise.stop(now + 0.2);
 }
 
+/** Fire crackling — called periodically when fire buildup > 0.3 */
+export function playFireCrackle(intensity: number) {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const vol = intensity * 0.2;
+
+  // Short noise bursts at varying frequencies for crackling
+  for (let i = 0; i < 3; i++) {
+    const t = now + i * 0.04;
+    const noise = ac.createBufferSource();
+    noise.buffer = makeNoise(ac, 0.06);
+    const bp = ac.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1000 + Math.random() * 3000;
+    bp.Q.value = 3;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol * (0.5 + Math.random() * 0.5), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    noise.connect(bp).connect(g).connect(ac.destination);
+    noise.start(t);
+    noise.stop(t + 0.06);
+  }
+}
+
+/** Ice creaking — called periodically when ice buildup > 0.3 */
+export function playIceCreak(intensity: number) {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const vol = intensity * 0.15;
+
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  const freq = 800 + Math.random() * 400;
+  osc.frequency.setValueAtTime(freq, now);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.7, now + 0.15);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  osc.connect(g).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.15);
+}
+
+/** Sharp crystallize sound — ice hits 1.0 */
+export function playFreeze() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+
+  // High pitched shimmer
+  for (const freq of [2000, 3000, 4000]) {
+    const osc = ac.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, now);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.15, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    osc.connect(g).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  }
+
+  // Noise burst
+  const noise = ac.createBufferSource();
+  noise.buffer = makeNoise(ac, 0.3);
+  const hp = ac.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 4000;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.2, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  noise.connect(hp).connect(ng).connect(ac.destination);
+  noise.start(now);
+  noise.stop(now + 0.3);
+}
+
 /** Soft filtered noise — continuous while ball moves */
 let rollNoise: AudioBufferSourceNode | null = null;
 let rollGain: GainNode | null = null;

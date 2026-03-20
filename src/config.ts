@@ -51,7 +51,7 @@ export const CONFIG = {
   },
   surfaces: {
     ice: { color: 0xaaddee, emissive: 0x446688, opacity: 1 },
-    lava: { color: 0xcc3300, emissive: 0xff4400, damageTime: 3 },
+    lava: { color: 0xcc3300, emissive: 0xff4400 },
     bounce: { color: 0x88cc44, emissive: 0x44aa22, impulse: 18 },
     speed: { color: 0x223366, emissive: 0x2244cc, force: 7 },
     crumbling: { color: 0xccaa77, emissive: 0x000000, delay: 2.0, respawn: 3.0 },
@@ -79,6 +79,27 @@ export const CONFIG = {
       speedBoost: 0xff8844,
       shield: 0x44ff88,
       timeFreeze: 0xffdd44,
+    },
+  },
+  elemental: {
+    fire: {
+      buildRate: 0.25,
+      decayRate: 0.15,
+      counteractRate: 0.35,
+      speedBoost: 1.8,          // force multiplied by up to this at max buildup
+      spasmChance: 0.12,        // chance per frame of a sudden jolt
+      spasmForce: 45,           // magnitude of sporadic jolt
+      turnAmplify: 2.5,         // steering sensitivity multiplier at max
+      directionFlipChance: 0.04, // chance per frame of full reversal above threshold
+      directionFlipThreshold: 0.6,
+    },
+    ice: {
+      buildRate: 0.2,
+      decayRate: 0.1,
+      counteractRate: 0.3,
+      maxReduction: 0.95,
+      smoothingMax: 0.9,
+      freezeDuration: 2.0,
     },
   },
 } as const;

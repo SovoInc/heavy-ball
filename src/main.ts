@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { Renderer } from "./renderer";
 import { Physics } from "./physics";
 import { Ball } from "./objects/Ball";
@@ -7,7 +8,8 @@ import { LevelManager } from "./levels/LevelManager";
 import { HUD } from "./hud";
 import { CONFIG } from "./config";
 import { DebugRenderer } from "./debug";
-import { playFall, playLevelComplete, playPowerUp, updateRoll } from "./audio";
+import { playFall, playLevelComplete, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
+import { ElementalBuildup } from "./elemental/ElementalBuildup";
 import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
 import { api, setAuthToken, shortenWalletAddress } from "./api";
@@ -26,6 +28,7 @@ class Game {
   private hud: HUD;
   private debug: DebugRenderer;
   private powerUpManager: PowerUpManager;
+  private elementalBuildup: ElementalBuildup;
   private state: GameState = "menu";
   private lastTime = 0;
   private screenShake = 0;
@@ -33,6 +36,7 @@ class Game {
   private speedBoosts = 0;
   private currentBallScale = 1;
   private player: PlayerState | null = null;
+  private elementalSoundTimer = 0;
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -45,6 +49,8 @@ class Game {
     this.hud = new HUD();
     this.debug = new DebugRenderer(this.renderer.scene, this.physics);
     this.powerUpManager = new PowerUpManager();
+    this.elementalBuildup = new ElementalBuildup();
+    this.controls.elementalBuildup = this.elementalBuildup;
 
     this.setupPowerUpCallbacks();
     this.setupHUDCallbacks();
@@ -83,7 +89,7 @@ class Game {
         // Offline — start from 0
       }
     }
-    this.hud.showStartScreen(continueLevel, this.getPlayerIdentifier());
+    this.hud.showStartScreen(continueLevel, this.getPlayerIdentifier(), this.player?.id ?? 0);
   }
 
   private setupLevelSelectKey() {
@@ -195,10 +201,12 @@ class Game {
     this.fallCount = 0;
     this.speedBoosts = 0;
     this.powerUpManager.reset();
+    this.elementalBuildup.reset();
     this.ball.resetScale();
     this.currentBallScale = 1;
     this.controls.speedMultiplier = 1;
     this.hud.clearPowerUps();
+    this.hud.updateElementalBuildup(0, 0);
     this.hud.setLevel(this.levelManager.currentLevelName, this.levelManager.currentLevelNumber - 1);
     this.hud.startTimer();
     this.camera.snapTo(this.ball);
@@ -219,7 +227,7 @@ class Game {
     const levelNumber = this.levelManager.currentLevelNumber;
 
     try {
-      await api.submitScore({
+      const result = await api.submitScore({
         player_id: this.player.id,
         level: levelNumber,
         time_ms: Math.round(timeMs),
@@ -227,7 +235,12 @@ class Game {
         power_ups_collected: level?.powerUpsCollected ?? 0,
         fall_count: this.fallCount,
         speed_boosts: this.speedBoosts,
+        fire_maxed: this.elementalBuildup.fireMaxed,
+        ice_maxed: this.elementalBuildup.iceMaxed,
       });
+      if (result.achievements_unlocked.length > 0) {
+        this.hud.showAchievementUnlocked(result.achievements_unlocked, result.achievements_display);
+      }
     } catch {
       // Silently fail if server is down
     }
@@ -269,16 +282,46 @@ class Game {
       this.levelManager.update(dt, this.powerUpManager.hasShield());
       this.powerUpManager.update(dt);
 
-      // Check for surface-triggered reset (lava)
+      // Elemental buildup system
       const lvl = this.levelManager.currentLevel;
-      if (lvl && lvl.pendingReset) {
-        lvl.pendingReset = false;
-        playFall();
-        this.fallCount++;
-        this.screenShake = 0.3;
-        lvl.restoreBoxes();
-        this.ball.setPosition(...lvl.startPosition);
-        this.camera.snapTo(this.ball);
+      if (lvl) {
+        const wasFrozen = this.elementalBuildup.frozen;
+        this.elementalBuildup.onFire = lvl.ballOnLava;
+        this.elementalBuildup.onIce = lvl.ballOnIce;
+        this.elementalBuildup.update(dt, this.powerUpManager.hasShield());
+
+        // Freeze trigger sound
+        if (this.elementalBuildup.frozen && !wasFrozen) {
+          playFreeze();
+        }
+
+        // Ball tint
+        const ballMat = this.ball.mesh.material as THREE.MeshStandardMaterial;
+        if (this.elementalBuildup.fire > 0.01) {
+          const t = this.elementalBuildup.fire;
+          ballMat.emissive.setRGB(t * 1.0, t * 0.3, 0);
+        } else if (this.elementalBuildup.ice > 0.01) {
+          const t = this.elementalBuildup.ice;
+          ballMat.emissive.setRGB(0, t * 0.4, t * 1.0);
+        } else {
+          ballMat.emissive.setRGB(0, 0, 0);
+        }
+
+        // Elemental ambient sounds
+        this.elementalSoundTimer -= dt;
+        if (this.elementalSoundTimer <= 0) {
+          if (this.elementalBuildup.fire > 0.3) {
+            playFireCrackle(this.elementalBuildup.fire);
+            this.elementalSoundTimer = 0.3 + Math.random() * 0.3;
+          } else if (this.elementalBuildup.ice > 0.3) {
+            playIceCreak(this.elementalBuildup.ice);
+            this.elementalSoundTimer = 0.5 + Math.random() * 0.5;
+          } else {
+            this.elementalSoundTimer = 0.2;
+          }
+        }
+
+        this.hud.updateElementalBuildup(this.elementalBuildup.fire, this.elementalBuildup.ice);
       }
 
       this.hud.updatePowerUps(this.powerUpManager.getActivePowerUps());
@@ -296,6 +339,8 @@ class Game {
       updateRoll(speed);
 
       if (this.ball.position.y < CONFIG.world.fallThreshold) {
+        this.elementalBuildup.reset();
+        this.hud.updateElementalBuildup(0, 0);
         if (!this.powerUpManager.hasShield()) {
           playFall();
           this.fallCount++;
@@ -318,6 +363,8 @@ class Game {
         const timeMs = this.hud.stopTimer();
         this.controls.setEnabled(false);
         this.hud.clearPowerUps();
+        this.elementalBuildup.reset();
+        this.hud.updateElementalBuildup(0, 0);
 
         this.submitScore(timeMs);
 

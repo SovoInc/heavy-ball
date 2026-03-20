@@ -5,3 +5,5 @@ pub const POWER_COLLECTOR: &str = "power_collector";
 pub const COMPLETIONIST: &str = "completionist";
 pub const NO_FALL: &str = "no_fall";
 pub const SPEEDSTER: &str = "speedster";
+pub const FIRE_MAXED: &str = "fire_maxed";
+pub const ICE_MAXED: &str = "ice_maxed";

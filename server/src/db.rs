@@ -68,6 +68,15 @@ impl Db {
             )?;
         }
 
+        // Migration: add fire_maxed, ice_maxed columns
+        let has_fire_maxed: bool = conn.prepare("SELECT fire_maxed FROM scores LIMIT 0").is_ok();
+        if !has_fire_maxed {
+            conn.execute_batch(
+                "ALTER TABLE scores ADD COLUMN fire_maxed INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE scores ADD COLUMN ice_maxed INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -119,8 +128,11 @@ impl Db {
         &self, player_id: i64, level: i64, time_ms: i64,
         boxes_broken: i64, power_ups_collected: i64,
         fall_count: i64, speed_boosts: i64,
+        fire_maxed: bool, ice_maxed: bool,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
+        let fire_i = fire_maxed as i64;
+        let ice_i = ice_maxed as i64;
         let existing: Option<(i64, i64)> = conn.prepare(
             "SELECT id, time_ms FROM scores WHERE player_id = ?1 AND level = ?2",
         )?.query_row(params![player_id, level], |row| {
@@ -130,16 +142,23 @@ impl Db {
         match existing {
             Some((id, old_time)) if time_ms < old_time => {
                 conn.execute(
-                    "UPDATE scores SET time_ms=?1, boxes_broken=?2, power_ups_collected=?3, fall_count=?4, speed_boosts=?5 WHERE id=?6",
-                    params![time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, id],
+                    "UPDATE scores SET time_ms=?1, boxes_broken=?2, power_ups_collected=?3, fall_count=?4, speed_boosts=?5, fire_maxed=?6, ice_maxed=?7 WHERE id=?8",
+                    params![time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_i, ice_i, id],
                 )?;
                 Ok(id)
             }
-            Some((id, _)) => Ok(id),
+            Some((id, _)) => {
+                // Even if time isn't better, update elemental flags (OR with existing)
+                conn.execute(
+                    "UPDATE scores SET fire_maxed = MAX(fire_maxed, ?1), ice_maxed = MAX(ice_maxed, ?2) WHERE id = ?3",
+                    params![fire_i, ice_i, id],
+                )?;
+                Ok(id)
+            }
             None => {
                 conn.execute(
-                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts) VALUES (?1,?2,?3,?4,?5,?6,?7)",
-                    params![player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts],
+                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_maxed, ice_maxed) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    params![player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_i, ice_i],
                 )?;
                 Ok(conn.last_insert_rowid())
             }

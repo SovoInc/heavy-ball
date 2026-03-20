@@ -47,6 +47,8 @@ export class Level {
   pendingReset = false;
   boxesBroken = 0;
   powerUpsCollected = 0;
+  ballOnLava = false;
+  ballOnIce = false;
 
   onPowerUpCollected?: (type: PowerUpType) => void;
 
@@ -58,7 +60,6 @@ export class Level {
   private bodyToObstacle = new Map<CANNON.Body, Obstacle>();
   private collideHandler: ((event: { body: CANNON.Body; contact: CANNON.ContactEquation }) => void) | null = null;
   private ball: Ball | null = null;
-  private lavaTimers = new Map<PathSegment | CurvedPathSegment, number>();
   private lavaHissPlayed = new Set<PathSegment | CurvedPathSegment>();
   private bounceCooldown = 0;
   private teleportLocked: TeleportPad | null = null; // pad the ball last arrived at
@@ -198,6 +199,9 @@ export class Level {
   }
 
   update(dt: number, shielded = false) {
+    this.ballOnLava = false;
+    this.ballOnIce = false;
+
     for (const o of this.obstacles) {
       if (!o.destroyed) o.update(dt);
     }
@@ -216,7 +220,7 @@ export class Level {
       const ballPos = this.ball.body.position;
       const ballR = CONFIG.ball.radius;
 
-      // Track which lava segments ball is currently on
+      // Track which lava segments ball is currently on (for hiss sound dedup)
       const activeLavaSegments = new Set<PathSegment | CurvedPathSegment>();
 
       for (const seg of this.pathSegments) {
@@ -241,20 +245,15 @@ export class Level {
         switch (seg.surfaceType) {
           case SurfaceType.Lava: {
             activeLavaSegments.add(seg);
-            if (shielded) {
-              this.lavaTimers.set(seg, 0);
-            } else {
-              const timer = (this.lavaTimers.get(seg) ?? 0) + dt;
-              this.lavaTimers.set(seg, timer);
-              if (timer >= CONFIG.surfaces.lava.damageTime) {
-                this.pendingReset = true;
-                this.pendingShake = 0.3;
-              }
-            }
+            this.ballOnLava = true;
             if (!this.lavaHissPlayed.has(seg)) {
               this.lavaHissPlayed.add(seg);
               playLavaHiss();
             }
+            break;
+          }
+          case SurfaceType.Ice: {
+            this.ballOnIce = true;
             break;
           }
           case SurfaceType.Bounce: {
@@ -316,20 +315,15 @@ export class Level {
         switch (cseg.surfaceType) {
           case SurfaceType.Lava: {
             activeLavaSegments.add(cseg);
-            if (shielded) {
-              this.lavaTimers.set(cseg, 0);
-            } else {
-              const timer = (this.lavaTimers.get(cseg) ?? 0) + dt;
-              this.lavaTimers.set(cseg, timer);
-              if (timer >= CONFIG.surfaces.lava.damageTime) {
-                this.pendingReset = true;
-                this.pendingShake = 0.3;
-              }
-            }
+            this.ballOnLava = true;
             if (!this.lavaHissPlayed.has(cseg)) {
               this.lavaHissPlayed.add(cseg);
               playLavaHiss();
             }
+            break;
+          }
+          case SurfaceType.Ice: {
+            this.ballOnIce = true;
             break;
           }
           case SurfaceType.Bounce: {
@@ -359,10 +353,9 @@ export class Level {
         }
       }
 
-      // Reset lava timers for segments the ball left
-      for (const [seg] of this.lavaTimers) {
+      // Reset lava hiss for segments the ball left
+      for (const seg of this.lavaHissPlayed) {
         if (!activeLavaSegments.has(seg)) {
-          this.lavaTimers.delete(seg);
           this.lavaHissPlayed.delete(seg);
         }
       }
@@ -433,9 +426,9 @@ export class Level {
     for (const cseg of this.curvedPathSegments) {
       cseg.restore();
     }
-    // Clear lava timers on reset
-    this.lavaTimers.clear();
     this.lavaHissPlayed.clear();
+    this.ballOnLava = false;
+    this.ballOnIce = false;
   }
 
   isComplete(ball: Ball): boolean {

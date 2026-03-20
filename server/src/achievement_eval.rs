@@ -8,6 +8,8 @@ pub struct RunInput {
     pub power_ups_collected: i64,
     pub fall_count: i64,
     pub speed_boosts: i64,
+    pub fire_maxed: bool,
+    pub ice_maxed: bool,
 }
 
 /// Evaluates which achievements are newly unlocked by this run.
@@ -29,6 +31,8 @@ pub fn evaluate_achievements(
         (COMPLETIONIST, "Completionist"),
         (NO_FALL, "No Fall"),
         (SPEEDSTER, "Speedster"),
+        (FIRE_MAXED, "Overheated"),
+        (ICE_MAXED, "Frozen Solid"),
     ];
 
     let mut newly_unlocked: Vec<(String, String)> = Vec::new();
@@ -67,6 +71,12 @@ pub fn evaluate_achievements(
             k if k == SPEEDSTER => {
                 db.player_aggregate(player_id, "speed_boosts").unwrap_or(0) >= 10
             }
+
+            // Reach max fire buildup
+            k if k == FIRE_MAXED => run.fire_maxed,
+
+            // Reach max ice buildup (get frozen)
+            k if k == ICE_MAXED => run.ice_maxed,
 
             _ => false,
         };

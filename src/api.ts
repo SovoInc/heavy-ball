@@ -25,6 +25,8 @@ export interface RunData {
   power_ups_collected: number;
   fall_count: number;
   speed_boosts: number;
+  fire_maxed: boolean;
+  ice_maxed: boolean;
 }
 
 export interface ScoreResult {
