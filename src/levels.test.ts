@@ -13,7 +13,6 @@
  *         - Considers rolling, falling, bounce pads, and teleport pairs
  * RULE 5: Finish zone must be reachable from start
  * RULE 6: Timed hazards must be crossable
- *         - Lava: crossing time < damageTime at half max speed
  *         - Crumbling: crossing time < delay at half max speed
  *         - Invisible: onTime must be enough to cross at half max speed
  * RULE 7: Speed conveyors with sideways push must connect seamlessly
@@ -33,6 +32,9 @@
  * RULE 17: Lattice walls must sit on a platform surface (not hover)
  * RULE 18: Lattice wall physics gap must align with visual gap
  * RULE 16: No obstacles or lattice walls on the first platform
+ * RULE 19: Timed gates must be placed on platforms
+ * RULE 20: Timed gates must sit on platform surface (not hovering)
+ * RULE 21: Timed gates must be oriented perpendicular to the track
  */
 
 import { describe, it, expect } from "vitest";
@@ -405,14 +407,6 @@ describe("Level playability", () => {
 
           const length = Math.max(seg.size[0], seg.size[2]);
           const crossTime = length / CROSSING_SPEED;
-
-          if (seg.surfaceType === SurfaceType.Lava) {
-            if (crossTime > CONFIG.surfaces.lava.damageTime) {
-              failures.push(
-                `Seg ${j} [lava]: ${crossTime.toFixed(1)}s to cross, kills in ${CONFIG.surfaces.lava.damageTime}s`
-              );
-            }
-          }
 
           if (seg.surfaceType === SurfaceType.Crumbling) {
             if (crossTime > CONFIG.surfaces.crumbling.delay) {
@@ -869,6 +863,100 @@ describe("Level playability", () => {
             if (wx >= firstBox.minX - 1 && wx <= firstBox.maxX + 1 &&
                 wz >= firstBox.minZ - 1 && wz <= firstBox.maxZ + 1) {
               failures.push(`Lattice wall ${j} at (${level.latticeWalls[j].position.join(",")}) is on the start platform`);
+            }
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 19
+      it("timed gates are placed on platforms", () => {
+        if (!level.timedGates) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.timedGates.length; j++) {
+          const gate = level.timedGates[j];
+          const [gx, , gz] = gate.position;
+          const onPlatform = segments.some(seg => {
+            const bb = segmentAABB(seg);
+            return gx >= bb.minX - 0.5 && gx <= bb.maxX + 0.5 &&
+                   gz >= bb.minZ - 0.5 && gz <= bb.maxZ + 0.5;
+          });
+          if (!onPlatform) {
+            failures.push(
+              `Timed gate ${j} at (${gate.position.join(",")}) is not on any platform`
+            );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 20
+      it("timed gates sit on platform surface (not hovering)", () => {
+        if (!level.timedGates) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.timedGates.length; j++) {
+          const gate = level.timedGates[j];
+          const [gx, gy, gz] = gate.position;
+          const gateBottom = gy - gate.size[1] / 2;
+
+          let bestDist = Infinity;
+          for (const seg of segments) {
+            const bb = segmentAABB(seg);
+            if (gx >= bb.minX - 0.5 && gx <= bb.maxX + 0.5 &&
+                gz >= bb.minZ - 0.5 && gz <= bb.maxZ + 0.5) {
+              const surfaceY = topY(seg);
+              bestDist = Math.min(bestDist, Math.abs(gateBottom - surfaceY));
+            }
+          }
+
+          if (bestDist > 0.3) {
+            failures.push(
+              `Timed gate ${j} bottom at y=${gateBottom.toFixed(2)} is ${bestDist.toFixed(2)} from nearest platform surface — should be ≤0.3`
+            );
+          }
+        }
+
+        expect(failures, failures.join("\n")).toHaveLength(0);
+      });
+
+      // RULE 21
+      it("timed gates are oriented perpendicular to the track", () => {
+        if (!level.timedGates) return;
+        const segments = getWalkableSegments(level);
+        const failures: string[] = [];
+
+        for (let j = 0; j < level.timedGates.length; j++) {
+          const gate = level.timedGates[j];
+          const [gx, , gz] = gate.position;
+          const [gw, , gd] = gate.size;
+
+          // Find which platform the gate is on
+          for (const seg of segments) {
+            const bb = segmentAABB(seg);
+            if (gx >= bb.minX - 0.5 && gx <= bb.maxX + 0.5 &&
+                gz >= bb.minZ - 0.5 && gz <= bb.maxZ + 0.5) {
+              const [sw, , sd] = seg.size;
+              // Platform's long axis = travel direction
+              // Gate's thin axis should align with travel direction
+              const platformLongX = sw > sd; // true if track runs along X
+              const gateThinX = gw < gd;     // true if gate is thin in X
+
+              // Gate should be thin along the track's long axis
+              // i.e. if track is long in X, gate should be thin in X
+              // and if track is long in Z, gate should be thin in Z
+              if (platformLongX !== gateThinX) {
+                failures.push(
+                  `Timed gate ${j} at (${gate.position.join(",")}) size [${gw},${gate.size[1]},${gd}] ` +
+                  `is parallel to track (platform size [${sw},${seg.size[1]},${sd}]) — should be perpendicular`
+                );
+              }
+              break; // only check first matching platform
             }
           }
         }

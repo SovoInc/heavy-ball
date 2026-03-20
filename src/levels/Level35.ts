@@ -58,7 +58,7 @@ const level: LevelData = {
     { position: [s7[0], y7, s7[2]], width: 6, height: 2, rotation: h7, gapSide: "center", gapWidth: 2.0 },
   ],
   timedGates: [
-    { position: [s9[0], 0.75 + 1.25, s9[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 2 },
+    { position: [s9[0], 0.25 + 1.25, s9[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 2 },
   ],
 };
 

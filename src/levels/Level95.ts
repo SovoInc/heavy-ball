@@ -127,7 +127,7 @@ const level: LevelData = {
   ],
   timedGates: [
     { position: [gate1[0], 1.5, gate1[2]], size: [6, 2.5, 0.5], onTime: 2.0, offTime: 1.5 },
-    { position: [gate2[0], gate2[1] + 1.25, gate2[2]], size: [0.5, 2.5, 6], onTime: 1.5, offTime: 2.0 },
+    { position: [gate2[0], gate2[1] + 1.25, gate2[2]], size: [6, 2.5, 0.5], onTime: 1.5, offTime: 2.0 },
     { position: [gate3[0], gate3[1] + 1.25, gate3[2]], size: [0.5, 2.5, 6], onTime: 2.0, offTime: 1.5 },
     { position: [gate4[0], gate4[1] + 1.25, gate4[2]], size: [6, 2.5, 0.5], onTime: 1.5, offTime: 2.0 },
   ],

@@ -68,7 +68,7 @@ const level: LevelData = {
     },
   ],
   timedGates: [
-    { position: [s2_3[0], 0.75 + 1.25, s2_3[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 2 },
+    { position: [s2_3[0], 0.25 + 1.25, s2_3[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 2 },
   ],
   teleportPairs: [
     { a: [tp1A[0], y1A, tp1A[2]], b: [tp1B[0], y1B, tp1B[2]] },

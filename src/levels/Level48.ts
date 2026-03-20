@@ -36,8 +36,8 @@ const level: LevelData = {
   ],
   timedGates: [
     { position: [g1[0], 1.5, g1[2]], size: [6, 2.5, 0.5], onTime: 2.5, offTime: 2.0 },
-    { position: [g2[0], 0.75 + 1.25, g2[2]], size: [0.5, 2.5, 6], onTime: 2.0, offTime: 2.0 },
-    { position: [g3[0], 0.75 + 1.25, g3[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 1.5 },
+    { position: [g2[0], 0.25 + 1.25, g2[2]], size: [0.5, 2.5, 6], onTime: 2.0, offTime: 2.0 },
+    { position: [g3[0], 0.25 + 1.25, g3[2]], size: [0.5, 2.5, 6], onTime: 2.5, offTime: 1.5 },
   ],
   latticeWalls: [
     { position: [g3[0], y3g, g3[2]], width: 6, height: 2, rotation: h3g, gapSide: "center", gapWidth: 2.0 },
