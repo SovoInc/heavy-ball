@@ -63,8 +63,9 @@ impl Db {
         let has_wallet: bool = conn.prepare("SELECT wallet_address FROM players LIMIT 0").is_ok();
         if !has_wallet {
             conn.execute_batch(
-                "ALTER TABLE players ADD COLUMN wallet_address TEXT UNIQUE;
-                 ALTER TABLE players ADD COLUMN network_id TEXT;",
+                "ALTER TABLE players ADD COLUMN wallet_address TEXT;
+                 ALTER TABLE players ADD COLUMN network_id TEXT;
+                 CREATE UNIQUE INDEX IF NOT EXISTS idx_players_wallet ON players(wallet_address);",
             )?;
         }
 
