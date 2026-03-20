@@ -38,7 +38,7 @@ t.straight(10, { surfaceType: SurfaceType.Bounce });
 t.drop(-3);
 t.left(8);                                                                    // curve 2 → heading 0
 
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s1_10 = t.lastCenter(); const h1_10 = t.lastHeading(); const y1_10 = t.lastSurfaceY();
 
 // Moving platform 1: heading 0 → Z-axis
@@ -97,7 +97,7 @@ t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s2_11 = t.lastCenter(); const h2_11 = t.lastHeading(); const y2_11 = t.lastSurfaceY();
 t.left(6);                                                                    // curve 7 → heading -π/2
 
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s2_13 = t.lastCenter(); const h2_13 = t.lastHeading(); const y2_13 = t.lastSurfaceY();
 t.straight(7, { surfaceType: SurfaceType.Lava });
 const s2_lava = t.lastCenter();
@@ -115,7 +115,7 @@ t.x = 200; t.z = 400; t.y = 0; t.heading = 0;
 
 t.straight(10);                                                               // telepad 2B here
 const tp2B = t.lastCenter(); const y2B = t.lastSurfaceY();
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s3_invis = t.lastCenter(); const h3_invis = t.lastHeading(); const y3_invis = t.lastSurfaceY();
 t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s3_mag = t.lastCenter(); const h3_mag = t.lastHeading(); const y3_mag = t.lastSurfaceY();
@@ -151,7 +151,7 @@ t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s3_12 = t.lastCenter();
 t.right(8);                                                                   // curve 12 → heading 0
 
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 t.straight(10);                                                               // finish
 
 const level: LevelData = {

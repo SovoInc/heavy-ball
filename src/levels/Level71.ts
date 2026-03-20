@@ -47,7 +47,7 @@ t.straight(10, { surfaceType: SurfaceType.Magnet });
 const s2d = t.lastCenter();
 const h2d = t.lastHeading();
 const y2d = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2e = t.lastCenter();
 const h2e = t.lastHeading();
 const y2e = t.lastSurfaceY();

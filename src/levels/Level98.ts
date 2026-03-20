@@ -34,13 +34,13 @@ const s9 = t.lastCenter(); const h9 = t.lastHeading(); const y9 = t.lastSurfaceY
 // Timed gate 2
 const gate2 = t.lastCenter();
 
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
 t.left(6);                                                                    // curve 3 → heading -π/2
 
 // Section 4: Invisible + lava
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(12, { surfaceType: SurfaceType.Ice });
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
 
@@ -85,7 +85,7 @@ t.left(6);                                                                    //
 // Section 8: Crumbling + invisible
 t.straight(12, { surfaceType: SurfaceType.Crumbling });
 const s25 = t.lastCenter(); const h25 = t.lastHeading(); const y25 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 
 // Timed gate 5
 const gate5Pos = t.lastCenter();

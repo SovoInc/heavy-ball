@@ -19,7 +19,7 @@ const y6a = t.lastSurfaceY();
 t.straight(8);
 const s6 = t.lastCenter();
 t.left(6);                                                // curve 3
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s8 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });
 const s9 = t.lastCenter();

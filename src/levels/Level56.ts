@@ -4,21 +4,21 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);                                                                        // safe start
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } }); // invisible 1
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } }); // invisible 1
 t.left(6);                                                                             // curve 1
 t.straight(6);
 const s3 = t.lastCenter(); const h3 = t.lastHeading(); const y3 = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.0, offTime: 1.5 } }); // invisible 2
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } }); // invisible 2
 t.right(6);                                                                            // curve 2
 t.straight(7, { surfaceType: SurfaceType.Lava });                                      // lava
 const s6a = t.lastCenter(); const h6a = t.lastHeading(); const y6a = t.lastSurfaceY();
 t.straight(6);
 const s6 = t.lastCenter(); const h6 = t.lastHeading(); const y6 = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } }); // invisible 3
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } }); // invisible 3
 t.left(6);                                                                             // curve 3
 t.straight(10, { surfaceType: SurfaceType.Ice });                                      // ice
 const s8a = t.lastCenter();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.0, offTime: 1.5 } }); // invisible 4
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } }); // invisible 4
 t.right(6);                                                                            // curve 4
 t.straight(8, { surfaceType: SurfaceType.Crumbling });                                 // crumbling
 const s10 = t.lastCenter();

@@ -29,7 +29,7 @@ const s8 = t.lastCenter(); const h8 = t.lastHeading(); const y8 = t.lastSurfaceY
 t.left(8);                                                                    // curve 2 → heading 0
 
 // Section 3
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
 
 // Moving platform 1: heading 0 → Z-axis
@@ -64,12 +64,12 @@ const s19 = t.lastCenter(); const h19 = t.lastHeading(); const y19 = t.lastSurfa
 // Timed gate 3
 const gate3 = t.lastCenter();
 
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s20 = t.lastCenter(); const h20 = t.lastHeading(); const y20 = t.lastSurfaceY();
 t.right(8);                                                                   // curve 5 → heading π/2
 
 // Section 6
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(14, { surfaceType: SurfaceType.Ice });
 const s23 = t.lastCenter(); const h23 = t.lastHeading(); const y23 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Magnet });
@@ -96,7 +96,7 @@ const s30 = t.lastCenter(); const h30 = t.lastHeading(); const y30 = t.lastSurfa
 // Timed gate 5
 const gate5 = t.lastCenter();
 
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(14, { surfaceType: SurfaceType.Magnet });
 const s32 = t.lastCenter(); const h32 = t.lastHeading(); const y32 = t.lastSurfaceY();
 t.right(8);                                                                   // curve 8 → heading 0

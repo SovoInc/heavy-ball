@@ -20,7 +20,7 @@ t.straight(10, { surfaceType: SurfaceType.Crumbling });     // crumbling after d
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
 t.right(8);
 // After right turn, heading is π/2 (+X)
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s12 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });          // magnet
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();

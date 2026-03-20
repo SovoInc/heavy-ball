@@ -4,7 +4,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2 = t.lastCenter();
 const h2 = t.lastHeading();
 const y2 = t.lastSurfaceY();
@@ -12,7 +12,7 @@ t.right(8);
 // After right turn, heading is π/2 (+X)
 t.straight(7, { surfaceType: SurfaceType.Lava });          // lava
 const s3a = t.lastCenter();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s4 = t.lastCenter();
 t.left(8);
 // After left turn, heading is back to 0 (-Z)
@@ -20,7 +20,7 @@ t.straight(6);
 const s6 = t.lastCenter();
 const h6 = t.lastHeading();
 const y6 = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 t.left(6);
 // After left turn, heading is -π/2 (-X)
 t.straight(10, { surfaceType: SurfaceType.Ice });           // ice

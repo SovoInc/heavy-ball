@@ -4,7 +4,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);                                                               // safe start
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(8);
 const s3 = t.lastCenter();
 t.straight(10, { surfaceType: SurfaceType.Bounce });
@@ -12,7 +12,7 @@ t.drop(-2);
 t.right(8);                                                                   // curve 1 → heading π/2
 t.straight(12);
 const s6 = t.lastCenter(); const h6 = t.lastHeading(); const y6 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s6b = t.lastCenter(); const h6b = t.lastHeading(); const y6b = t.lastSurfaceY();
 t.straight(8, { surfaceType: SurfaceType.Bounce });
 t.drop(-2);
@@ -22,7 +22,7 @@ const s10 = t.lastCenter();
 t.straight(7, { surfaceType: SurfaceType.Lava });
 const s10b = t.lastCenter(); const h10b = t.lastHeading(); const y10b = t.lastSurfaceY();
 t.left(6);                                                                    // curve 3 → heading -π/2
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 1.5 } });
 const s12 = t.lastCenter(); const h12 = t.lastHeading(); const y12 = t.lastSurfaceY();
 t.straight(8);
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();

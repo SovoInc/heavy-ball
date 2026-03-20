@@ -27,7 +27,7 @@ t.straight(12, { surfaceType: SurfaceType.Ice });
 t.left(8);                                                                    // curve 2 → heading 0
 
 // Section 3: Relief
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s9 = t.lastCenter(); const h9 = t.lastHeading(); const y9 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Magnet });
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
@@ -77,7 +77,7 @@ t.left(8);                                                                    //
 t.straight(16, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
 const s21 = t.lastCenter(); const h21 = t.lastHeading(); const y21 = t.lastSurfaceY();
 t.left(6);                                                                    // curve 7 → heading -π/2
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 t.straight(10);
 
 const level: LevelData = {

@@ -4,11 +4,11 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);                                                               // safe start
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(8);
 const s3 = t.lastCenter(); const h3 = t.lastHeading(); const y3 = t.lastSurfaceY();
 t.right(8);                                                                   // curve 1 → heading π/2
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 1.5 } });
 const s5 = t.lastCenter();
 t.straight(10);
 const s6 = t.lastCenter();
@@ -17,7 +17,7 @@ const s6b = t.lastCenter(); const h6b = t.lastHeading(); const y6b = t.lastSurfa
 t.left(8);                                                                    // curve 2 → heading 0
 t.straight(10);
 const s8 = t.lastCenter(); const h8 = t.lastHeading(); const y8 = t.lastSurfaceY();
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s9 = t.lastCenter(); const h9 = t.lastHeading(); const y9 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Ice });
 const s9b = t.lastCenter(); const h9b = t.lastHeading(); const y9b = t.lastSurfaceY();
@@ -27,7 +27,7 @@ const s11 = t.lastCenter(); const h11 = t.lastHeading(); const y11 = t.lastSurfa
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
 const s11b = t.lastCenter();
 t.right(8);                                                                   // curve 4 → heading 0
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
 t.straight(10);
 const s14 = t.lastCenter();

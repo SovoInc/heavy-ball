@@ -36,7 +36,7 @@ const s2_speed = t.lastCenter();
 t.left(6);                                                                    // curve 3 → heading π (reverse)
 t.straight(14, { surfaceType: SurfaceType.Speed, direction: [0, 0, 1] });
 const s2_speed2 = t.lastCenter(); const h2_speed2 = t.lastHeading(); const y2_speed2 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2_invis = t.lastCenter(); const h2_invis = t.lastHeading(); const y2_invis = t.lastSurfaceY();
 t.straight(10);
 t.straight(10);                                                               // telepad 2A here

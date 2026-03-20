@@ -27,7 +27,7 @@ t.left(8);
 // After left turn, heading is back to 0 (-Z)
 t.straight(10, { surfaceType: SurfaceType.Crumbling });    // crumbling
 const s11 = t.lastCenter(); const h11 = t.lastHeading(); const y11 = t.lastSurfaceY();
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s12 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });         // magnet
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();

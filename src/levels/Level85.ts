@@ -32,7 +32,7 @@ t.z -= 2; // gap after
 
 t.straight(6);                                                                // landing pad before turn
 t.left(6);                                                                    // curve 3 → heading -π/2
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 1.5 } });
 const s12 = t.lastCenter(); const h12 = t.lastHeading(); const y12 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Speed, direction: [-1, 0, 0] });
 const s12b = t.lastCenter();

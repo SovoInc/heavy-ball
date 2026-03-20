@@ -15,6 +15,7 @@
  * RULE 6: Timed hazards must be crossable
  *         - Crumbling: crossing time < delay at half max speed
  *         - Invisible: onTime must be enough to cross at half max speed
+ *         - Invisible: stable time (onTime - 1.5s flicker) must exceed crossing time
  * RULE 7: Speed conveyors with sideways push must connect seamlessly
  * RULE 8: Moving platforms must touch (not overlap) a neighbor at each extreme
  *         - Y-axis movers: rest position must touch a neighbor
@@ -422,6 +423,14 @@ describe("Level playability", () => {
             if (crossTime > seg.invisible.onTime) {
               failures.push(
                 `Seg ${j} [invisible]: ${crossTime.toFixed(1)}s to cross, visible for ${seg.invisible.onTime}s`
+              );
+            }
+            // onTime must exceed flicker warning (1.5s) so the platform has stable visible time
+            const flickerDuration = 1.5;
+            const stableTime = seg.invisible.onTime - flickerDuration;
+            if (stableTime < crossTime) {
+              failures.push(
+                `Seg ${j} [invisible]: onTime ${seg.invisible.onTime}s gives only ${stableTime.toFixed(1)}s stable (flicker starts 1.5s before off), need ${crossTime.toFixed(1)}s to cross`
               );
             }
           }

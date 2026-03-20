@@ -47,7 +47,7 @@ const s15 = t.lastCenter(); const h15 = t.lastHeading(); const y15 = t.lastSurfa
 t.left(8);                                                                    // curve 4 → heading 0
 
 // --- Section 5: Invisible + third drop ---
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s17 = t.lastCenter();
 
 // Moving platform 1: heading 0 → Z-axis
@@ -55,7 +55,7 @@ t.z -= 2; // gap before
 t.straight(8, { platformMoving: { axis: [0, 0, 1], range: 2, speed: 1.5, pause: 0.5 } });
 t.z -= 2; // gap after
 
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s18 = t.lastCenter(); const h18 = t.lastHeading(); const y18 = t.lastSurfaceY();
 
 // Timed gate 3

@@ -31,7 +31,7 @@ t.straight(12, { surfaceType: SurfaceType.Crumbling });
 const s14 = t.lastCenter(); const h14 = t.lastHeading(); const y14 = t.lastSurfaceY();
 t.straight(8, { surfaceType: SurfaceType.Bounce });
 t.drop(-2);
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s16 = t.lastCenter(); const h16 = t.lastHeading(); const y16 = t.lastSurfaceY();
 t.straight(10);
 

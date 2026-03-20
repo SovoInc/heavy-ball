@@ -26,7 +26,7 @@ const s11b = t.lastCenter(); const h11b = t.lastHeading(); const y11b = t.lastSu
 t.left(8);                                                                    // curve 4 → heading 0
 t.straight(12, { surfaceType: SurfaceType.Crumbling });
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s13b = t.lastCenter(); const h13b = t.lastHeading(); const y13b = t.lastSurfaceY();
 t.straight(7, { surfaceType: SurfaceType.Lava });
 const s13c = t.lastCenter();

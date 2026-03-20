@@ -34,7 +34,7 @@ t.right(8);                                                                   //
 t.drop(-2);
 
 // Section 3: Spiral arm 2
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
 t.straight(12, { surfaceType: SurfaceType.Speed, direction: [0, 0, 1] });
 const s11 = t.lastCenter(); const h11 = t.lastHeading(); const y11 = t.lastSurfaceY();
@@ -60,7 +60,7 @@ t.drop(-2);
 t.straight(12, { surfaceType: SurfaceType.Ice });
 const s18 = t.lastCenter();
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
-t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(14, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s20 = t.lastCenter(); const h20 = t.lastHeading(); const y20 = t.lastSurfaceY();
 
 // Timed gate 4
@@ -89,7 +89,7 @@ const s26 = t.lastCenter(); const h26 = t.lastHeading(); const y26 = t.lastSurfa
 t.left(6);                                                                    // curve 7 → heading -π/2
 
 // Section 8: Crumbling + invisible
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s28 = t.lastCenter();
 t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s29 = t.lastCenter(); const h29 = t.lastHeading(); const y29 = t.lastSurfaceY();

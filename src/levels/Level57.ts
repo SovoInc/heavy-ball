@@ -20,7 +20,7 @@ const s8 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Crumbling });   // crumbling
 const s9 = t.lastCenter(); const h9 = t.lastHeading(); const y9 = t.lastSurfaceY();
 t.right(6);                                              // curve 4
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s11 = t.lastCenter();
 t.straight(10);
 

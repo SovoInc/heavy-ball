@@ -59,7 +59,7 @@ t.x = 200; t.z = 400; t.y = 0; t.heading = 0;
 // === Section 3 (~55 units): Invisible, gate, extra hazards ===
 t.straight(10);                                                               // telepad 2B here
 const tp2B = t.lastCenter(); const y2B = t.lastSurfaceY();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const w4 = t.lastCenter(); const hw4 = t.lastHeading(); const yw4 = t.lastSurfaceY();
 t.right(8);                                                                   // curve → heading π/2
 t.straight(10);

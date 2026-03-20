@@ -10,7 +10,7 @@ const t = new TrackBuilder();
 t.straight(10);                                                               // safe start
 t.straight(12, { surfaceType: SurfaceType.Crumbling });
 const s2 = t.lastCenter(); const h2 = t.lastHeading(); const y2 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(8, { surfaceType: SurfaceType.Magnet });
 const s4 = t.lastCenter(); const h4 = t.lastHeading(); const y4 = t.lastSurfaceY();
 
@@ -41,7 +41,7 @@ t.left(6);                                                                    //
 // Section 4: Magnet + invisible
 t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 
 // Moving platform 1: heading -π/2 → X-axis
 t.x += 2; // gap before
@@ -71,7 +71,7 @@ const s20 = t.lastCenter(); const h20 = t.lastHeading(); const y20 = t.lastSurfa
 // Timed gate 4
 const gate4 = t.lastCenter();
 
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.left(8);                                                                    // curve 6 → heading 0
 
 // Section 7: Ice corridor
@@ -82,7 +82,7 @@ const s24 = t.lastCenter(); const h24 = t.lastHeading(); const y24 = t.lastSurfa
 t.left(6);                                                                    // curve 7 → heading -π/2
 
 // Section 8: Final invisible
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.straight(14, { surfaceType: SurfaceType.Ice });
 const s27 = t.lastCenter(); const h27 = t.lastHeading(); const y27 = t.lastSurfaceY();
 t.right(8);                                                                   // curve 8 → heading 0

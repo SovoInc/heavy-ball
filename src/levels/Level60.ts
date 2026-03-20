@@ -16,7 +16,7 @@ t.left(6);                                               // curve 3
 t.straight(8);
 const g1 = t.lastCenter(); const hg = t.lastHeading();
 t.right(6);                                              // curve 4
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.0, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
 t.straight(6, { surfaceType: SurfaceType.Magnet });      // magnet
 const s11 = t.lastCenter();

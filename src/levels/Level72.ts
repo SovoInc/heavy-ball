@@ -18,7 +18,7 @@ t.straight(10, { surfaceType: SurfaceType.Ice });
 const s4 = t.lastCenter();
 const h4 = t.lastHeading();
 const y4 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s4b = t.lastCenter();
 const h4b = t.lastHeading();
 const y4b = t.lastSurfaceY();

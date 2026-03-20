@@ -40,7 +40,7 @@ t.straight(8, { surfaceType: SurfaceType.Speed, direction: [0, 0, -1] });
 const s2b = t.lastCenter();
 t.left(6);
 // After left turn, heading is -π/2 (-X)
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s2d = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });
 const s2e = t.lastCenter();

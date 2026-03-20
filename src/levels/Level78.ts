@@ -49,7 +49,7 @@ t.straight(10, { surfaceType: SurfaceType.Speed, direction: [-1, 0, 0] });
 const s2e = t.lastCenter();
 t.right(8);
 // After right turn, heading is back to 0 (-Z)
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2g = t.lastCenter();
 const h2g = t.lastHeading();
 const y2g = t.lastSurfaceY();

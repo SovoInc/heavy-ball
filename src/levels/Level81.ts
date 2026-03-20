@@ -29,7 +29,7 @@ const s11b = t.lastCenter(); const h11b = t.lastHeading(); const y11b = t.lastSu
 t.right(8);                                                                   // curve 3 → heading π/2
 t.straight(12);
 const s13 = t.lastCenter();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s13b = t.lastCenter(); const h13b = t.lastHeading(); const y13b = t.lastSurfaceY();
 t.straight(7, { surfaceType: SurfaceType.Lava });
 const s13c = t.lastCenter(); const h13c = t.lastHeading(); const y13c = t.lastSurfaceY();

@@ -16,7 +16,7 @@ t.straight(8, { surfaceType: SurfaceType.Bounce });      // bounce 2
 t.right(6);                                              // curve 2
 t.straight(10, { surfaceType: SurfaceType.Crumbling });  // crumbling
 const s8 = t.lastCenter(); const h8 = t.lastHeading(); const y8 = t.lastSurfaceY();
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s9 = t.lastCenter();
 t.left(6);                                               // curve 3
 t.straight(7, { surfaceType: SurfaceType.Lava });        // second lava

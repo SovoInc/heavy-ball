@@ -34,7 +34,7 @@ const s1m = t.lastCenter(); const h1m = t.lastHeading(); const y1m = t.lastSurfa
 const gate2 = t.lastCenter();
 
 t.left(6);                                                                    // turn 6 → heading 0
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const tpA = t.lastCenter();
 const yA = t.lastSurfaceY();
 
@@ -60,7 +60,7 @@ const s2f = t.lastCenter(); const h2f = t.lastHeading(); const y2f = t.lastSurfa
 const gate3 = t.lastCenter();
 
 t.left(6);                                                                    // turn 9 → heading -π/2
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s2h = t.lastCenter(); const h2h = t.lastHeading(); const y2h = t.lastSurfaceY();
 t.right(6);                                                                   // turn 10 → heading 0
 t.straight(10, { surfaceType: SurfaceType.Magnet });

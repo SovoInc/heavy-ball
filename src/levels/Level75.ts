@@ -4,7 +4,7 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2 = t.lastCenter();
 const h2 = t.lastHeading();
 const y2 = t.lastSurfaceY();
@@ -12,7 +12,7 @@ t.straight(8);
 const s3 = t.lastCenter();
 t.right(8);
 // After right turn, heading is π/2 (+X)
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s5 = t.lastCenter();
 const h5 = t.lastHeading();
 const y5 = t.lastSurfaceY();
@@ -22,7 +22,7 @@ const h5b = t.lastHeading();
 const y5b = t.lastSurfaceY();
 t.left(8);
 // After left turn, heading is back to 0 (-Z)
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s7 = t.lastCenter();
 const h7 = t.lastHeading();
 const y7 = t.lastSurfaceY();
@@ -32,7 +32,7 @@ const h7b = t.lastHeading();
 const y7b = t.lastSurfaceY();
 t.left(6);
 // After left turn, heading is -π/2 (-X)
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s9 = t.lastCenter();
 const h9 = t.lastHeading();
 const y9 = t.lastSurfaceY();

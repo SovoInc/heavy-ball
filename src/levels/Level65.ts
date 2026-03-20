@@ -32,7 +32,7 @@ t.right(6);
 // After right turn, heading is back to 0 (-Z)
 t.straight(10, { surfaceType: SurfaceType.Crumbling });      // crumbling
 const s10 = t.lastCenter(); const h10 = t.lastHeading(); const y10 = t.lastSurfaceY();
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s11 = t.lastCenter();
 t.straight(10);
 

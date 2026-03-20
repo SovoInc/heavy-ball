@@ -14,7 +14,7 @@ const s4 = t.lastCenter(); const h4 = t.lastHeading(); const y4 = t.lastSurfaceY
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
 const s5a = t.lastCenter();
 t.right(6);                                              // curve 2
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s6 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });
 const s7 = t.lastCenter(); const h7 = t.lastHeading(); const y7 = t.lastSurfaceY();

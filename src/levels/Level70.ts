@@ -32,7 +32,7 @@ const h8 = t.lastHeading();
 const y8 = t.lastSurfaceY();
 t.right(6);
 // After right turn, heading is back to 0 (-Z)
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s10 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Magnet });          // magnet
 const s11 = t.lastCenter(); const h11 = t.lastHeading(); const y11 = t.lastSurfaceY();

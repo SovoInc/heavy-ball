@@ -30,7 +30,7 @@ const y8 = t.lastSurfaceY();
 t.drop(-3);
 t.left(6);
 // After left turn, heading is back to 0 (-Z)
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s10 = t.lastCenter();
 const h10 = t.lastHeading();
 const y10 = t.lastSurfaceY();

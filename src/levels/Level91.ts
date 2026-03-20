@@ -36,7 +36,7 @@ const gate2 = t.lastCenter();
 
 t.straight(12, { surfaceType: SurfaceType.Magnet });
 const s11 = t.lastCenter(); const h11 = t.lastHeading(); const y11 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s11b = t.lastCenter(); const h11b = t.lastHeading(); const y11b = t.lastSurfaceY();
 t.left(6);                                                                    // curve 3 → heading -π/2
 
@@ -44,7 +44,7 @@ t.left(6);                                                                    //
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
 t.straight(12, { surfaceType: SurfaceType.Ice });
 const s14 = t.lastCenter(); const h14 = t.lastHeading(); const y14 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 t.right(8);                                                                   // curve 4 → heading 0
 
 // --- Section 5: Ice + lava gauntlet ---

@@ -30,7 +30,7 @@ t.straight(7, { surfaceType: SurfaceType.Lava });                             //
 const w2 = t.lastCenter(); const hw2 = t.lastHeading(); const yw2 = t.lastSurfaceY();
 t.straight(8);
 const s2_4 = t.lastCenter();
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s2_6 = t.lastCenter();
 t.straight(10);                                                               // telepad 2A here
 const tp2A = t.lastCenter(); const y2A = t.lastSurfaceY();

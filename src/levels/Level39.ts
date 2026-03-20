@@ -29,7 +29,7 @@ t.straight(10);
 const s11 = t.lastCenter();
 t.straight(8, { surfaceType: SurfaceType.Ice });
 const s12 = t.lastCenter();
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 t.straight(10);
 
 const level: LevelData = {

@@ -34,7 +34,7 @@ const h5 = t.lastHeading();
 const y5 = t.lastSurfaceY();
 t.right(6);                    // curve 2 → heading 0
 
-t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 1.5, offTime: 1.5 } });
+t.straight(6, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
 const s7 = t.lastCenter();
 
 // Moving platform 3 — heading 0 (Z-axis mover)

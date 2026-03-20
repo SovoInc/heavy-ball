@@ -4,10 +4,10 @@ import { PowerUpType } from "../powerups/PowerUpType";
 
 const t = new TrackBuilder();
 t.straight(10);
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 t.straight(6);
 const s3 = t.lastCenter();
-t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2.5, offTime: 1.5 } });
+t.straight(8, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 t.straight(8, { surfaceType: SurfaceType.Crumbling });
 t.left(8);
 t.straight(7, { surfaceType: SurfaceType.Lava });

@@ -27,7 +27,7 @@ t.drop(-3);
 t.right(8);                                                                   // curve 2 → heading 0
 
 // Section 3: Crumbling + magnet
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 2 } });
 const s9 = t.lastCenter(); const h9 = t.lastHeading(); const y9 = t.lastSurfaceY();
 t.straight(10, { surfaceType: SurfaceType.Crumbling });
 t.straight(12, { surfaceType: SurfaceType.Magnet });
@@ -41,7 +41,7 @@ t.right(8);                                                                   //
 // Section 4: Relief + invisible
 t.straight(14, { surfaceType: SurfaceType.Ice });
 const s13 = t.lastCenter(); const h13 = t.lastHeading(); const y13 = t.lastSurfaceY();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3, offTime: 2 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 2 } });
 const s14 = t.lastCenter(); const h14 = t.lastHeading(); const y14 = t.lastSurfaceY();
 
 // Moving platform 1: heading π/2 → X-axis

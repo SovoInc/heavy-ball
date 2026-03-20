@@ -30,7 +30,7 @@ const s12 = t.lastCenter(); const h12 = t.lastHeading(); const y12 = t.lastSurfa
 t.straight(7, { surfaceType: SurfaceType.Lava });
 const s12b = t.lastCenter(); const h12b = t.lastHeading(); const y12b = t.lastSurfaceY();
 t.right(8);                                                                   // curve 4 → heading 0
-t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(12, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 4, offTime: 1.5 } });
 const s14 = t.lastCenter(); const h14 = t.lastHeading(); const y14 = t.lastSurfaceY();
 t.straight(10);
 t.straight(8);

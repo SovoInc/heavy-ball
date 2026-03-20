@@ -18,7 +18,7 @@ const s6b = t.lastCenter(); const h6b = t.lastHeading(); const y6b = t.lastSurfa
 t.left(8);                                                                    // curve 2 → heading 0
 t.straight(12);
 const s8 = t.lastCenter();
-t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 2, offTime: 1.5 } });
+t.straight(10, { surfaceType: SurfaceType.Invisible, invisible: { onTime: 3.5, offTime: 1.5 } });
 const s8b = t.lastCenter(); const h8b = t.lastHeading(); const y8b = t.lastSurfaceY();
 t.left(6);                                                                    // curve 3 → heading -π/2
 t.straight(14);
