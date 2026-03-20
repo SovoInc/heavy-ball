@@ -29,6 +29,10 @@ export interface RunData {
   ice_maxed: boolean;
 }
 
+export interface SessionResponse {
+  session_token: string;
+}
+
 export interface ScoreResult {
   id: number;
   achievements_unlocked: string[];
@@ -74,6 +78,28 @@ function authHeaders(): Record<string, string> {
   return h;
 }
 
+function base64url(data: ArrayBuffer | Uint8Array | string): string {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function signScoreJWT(payload: RunData, secret: string): Promise<string> {
+  const header = base64url('{"alg":"HS256","typ":"JWT"}');
+  const body = base64url(JSON.stringify(payload));
+  const message = `${header}.${body}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return `${message}.${base64url(sig)}`;
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
@@ -106,8 +132,13 @@ export const api = {
   registerWallet: (walletAddress: string, networkId: string) =>
     post<PlayerData>("/api/wallet", { wallet_address: walletAddress, network_id: networkId }),
 
-  submitScore: (data: RunData) =>
-    post<ScoreResult>("/api/scores", data),
+  startSession: (playerId: number, level: number) =>
+    post<SessionResponse>("/api/session/start", { player_id: playerId, level }),
+
+  submitScore: async (data: RunData, sessionToken: string): Promise<ScoreResult> => {
+    const scoreToken = await signScoreJWT(data, sessionToken);
+    return post<ScoreResult>("/api/scores", { session_token: sessionToken, score_token: scoreToken });
+  },
 
   getTopScores: (level: number, limit = 20) =>
     get<ScoreEntry[]>(`/api/scores/top?level=${level}&limit=${limit}`),

@@ -34,6 +34,7 @@ class Game {
   private screenShake = 0;
   private fallCount = 0;
   private speedBoosts = 0;
+  private sessionToken = "";
   private currentBallScale = 1;
   private player: PlayerState | null = null;
   private elementalSoundTimer = 0;
@@ -201,6 +202,7 @@ class Game {
     this.state = "playing";
     this.fallCount = 0;
     this.speedBoosts = 0;
+    this.sessionToken = "";
     this.powerUpManager.reset();
     this.elementalBuildup.reset();
     this.ball.resetScale();
@@ -213,6 +215,16 @@ class Game {
     this.camera.snapTo(this.ball);
     this.controls.setEnabled(true);
 
+    // Request a server session token for this level attempt
+    if (this.player && this.player.id > 0) {
+      api.startSession(this.player.id, this.levelManager.currentLevelNumber).then((res) => {
+        this.sessionToken = res.session_token;
+      }).catch(() => {
+        this.sessionToken = "";
+        this.hud.showToast("Offline — score won't be saved", "#ff6644");
+      });
+    }
+
     const level = this.levelManager.currentLevel;
     if (level) {
       level.onPowerUpCollected = (type) => {
@@ -223,6 +235,7 @@ class Game {
 
   private async submitScore(timeMs: number) {
     if (!this.player || this.player.id === 0) return;
+    if (!this.sessionToken) return; // No session — can't submit
 
     const level = this.levelManager.currentLevel;
     const levelNumber = this.levelManager.currentLevelNumber;
@@ -238,7 +251,7 @@ class Game {
         speed_boosts: this.speedBoosts,
         fire_maxed: this.elementalBuildup.fireMaxed,
         ice_maxed: this.elementalBuildup.iceMaxed,
-      });
+      }, this.sessionToken);
       if (result.achievements_unlocked.length > 0) {
         this.hud.showAchievementUnlocked(result.achievements_unlocked, result.achievements_display);
       }

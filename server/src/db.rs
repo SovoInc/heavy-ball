@@ -53,9 +53,18 @@ impl Db {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                level INTEGER NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE INDEX IF NOT EXISTS idx_scores_level ON scores(level, time_ms ASC);
             CREATE INDEX IF NOT EXISTS idx_scores_player ON scores(player_id);
             CREATE INDEX IF NOT EXISTS idx_achievements_player ON achievements(player_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_player ON sessions(player_id);
             ",
         )?;
 
@@ -122,8 +131,9 @@ impl Db {
 
     pub fn validate_auth_token(&self, token: &str) -> Result<Option<i64>> {
         let conn = self.conn.lock().unwrap();
+        // Tokens expire after 30 days
         let result = conn.query_row(
-            "SELECT player_id FROM auth_tokens WHERE token = ?1",
+            "SELECT player_id FROM auth_tokens WHERE token = ?1 AND created_at > datetime('now', '-30 days')",
             params![token],
             |r| r.get::<_, i64>(0),
         );
@@ -132,6 +142,15 @@ impl Db {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
         }
+    }
+
+    /// Remove auth tokens older than 30 days.
+    pub fn prune_expired_tokens(&self) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM auth_tokens WHERE created_at <= datetime('now', '-30 days')",
+            [],
+        )
     }
 
     pub fn upsert_score(
@@ -276,6 +295,53 @@ impl Db {
             Ok((row.get(0)?, row.get(1)?))
         })?;
         Ok(row)
+    }
+
+    /// Get the wallet_address for a player. Returns None if no wallet is set.
+    pub fn player_wallet(&self, player_id: i64) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn.query_row(
+            "SELECT wallet_address FROM players WHERE id = ?1",
+            params![player_id],
+            |r| r.get::<_, Option<String>>(0),
+        );
+        match result {
+            Ok(w) => Ok(w),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Create a new session row and return the session ID.
+    pub fn create_session(&self, player_id: i64, level: i64) -> Result<String> {
+        let conn = self.conn.lock().unwrap();
+        let id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO sessions (id, player_id, level) VALUES (?1, ?2, ?3)",
+            params![id, player_id, level],
+        )?;
+        Ok(id)
+    }
+
+    /// Mark a session as used. Returns true if it was valid and unused, false otherwise.
+    pub fn consume_session(&self, session_id: &str, player_id: i64, level: i64) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE sessions SET used = 1 WHERE id = ?1 AND player_id = ?2 AND level = ?3 AND used = 0",
+            params![session_id, player_id, level],
+        )?;
+        Ok(updated > 0)
+    }
+
+    /// Returns true if the player has a score recorded for the given level.
+    pub fn has_completed_level(&self, player_id: i64, level: i64) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM scores WHERE player_id = ?1 AND level = ?2",
+            params![player_id, level],
+            |r| r.get(0),
+        )?;
+        Ok(count > 0)
     }
 
     pub fn player_achievements(&self, player_id: i64) -> Result<Vec<(String, String)>> {

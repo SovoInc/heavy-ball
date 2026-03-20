@@ -19,7 +19,25 @@ pub struct PlayerResponse {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct SessionStartRequest {
+    pub player_id: i64,
+    pub level: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionStartResponse {
+    pub session_token: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ScoreSubmission {
+    pub session_token: String,
+    pub score_token: String,
+}
+
+/// The score data inside the client-signed JWT.
+#[derive(Debug, Deserialize)]
+pub struct ScorePayload {
     pub player_id: i64,
     pub level: i64,
     pub time_ms: i64,
