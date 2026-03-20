@@ -59,6 +59,15 @@ impl Db {
             ",
         )?;
 
+        // Migration: add wallet_address, network_id columns to players
+        let has_wallet: bool = conn.prepare("SELECT wallet_address FROM players LIMIT 0").is_ok();
+        if !has_wallet {
+            conn.execute_batch(
+                "ALTER TABLE players ADD COLUMN wallet_address TEXT UNIQUE;
+                 ALTER TABLE players ADD COLUMN network_id TEXT;",
+            )?;
+        }
+
         // Migration: add fall_count, speed_boosts columns
         let has_fall_count: bool = conn.prepare("SELECT fall_count FROM scores LIMIT 0").is_ok();
         if !has_fall_count {
