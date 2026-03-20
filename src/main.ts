@@ -14,7 +14,7 @@ import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
 import { api, setAuthToken, shortenWalletAddress } from "./api";
 import { getPlayer, setPlayer, clearPlayer, type PlayerState } from "./player";
-import { hasMidnightWallet, connectMidnightWallet, getMidnightWalletError, MIDNIGHT_NETWORK_ID } from "./midnight";
+import { hasMidnightWallet, connectMidnightWallet, getMidnightWalletError, type MidnightNetworkId } from "./midnight";
 
 type GameState = "menu" | "playing" | "levelComplete" | "allComplete";
 
@@ -135,16 +135,17 @@ class Game {
   }
 
   private setupHUDCallbacks() {
-    this.hud.onWalletConnect = async () => {
+    this.hud.onWalletConnect = async (networkId: string) => {
       this.hud.showWalletConnecting();
+      const network = networkId as MidnightNetworkId;
       try {
-        const connection = await connectMidnightWallet();
-        const data = await api.registerWallet(connection.address, MIDNIGHT_NETWORK_ID);
+        const connection = await connectMidnightWallet(network);
+        const data = await api.registerWallet(connection.address, network);
         this.player = {
           id: data.id,
           alias: data.alias ?? `wallet:${connection.address}`,
           wallet_address: data.wallet_address ?? connection.address,
-          network_id: data.network_id ?? MIDNIGHT_NETWORK_ID,
+          network_id: data.network_id ?? network,
           auth_token: data.auth_token,
         };
         if (data.auth_token) {
@@ -153,7 +154,7 @@ class Game {
         setPlayer(this.player);
         await this.showStartWithProgress();
       } catch (err) {
-        this.hud.showWalletError(getMidnightWalletError(err));
+        this.hud.showWalletError(getMidnightWalletError(err, network));
       }
     };
 

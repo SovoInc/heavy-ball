@@ -1,6 +1,7 @@
 import { PowerUpType } from "./powerups/PowerUpType";
 import { CONFIG } from "./config";
 import { api, type ScoreEntry, type LeaderboardEntry, type AchievementEntry, getDisplayName } from "./api";
+import { MIDNIGHT_NETWORKS, DEFAULT_NETWORK } from "./midnight";
 
 const ACHIEVEMENT_DEFS: Record<string, { name: string; desc: string; icon: string }> = {
   first_finish:   { name: "First Finish",    desc: "Complete any level",                  icon: "\u{1F3C1}" },
@@ -72,7 +73,7 @@ export class HUD {
   onStart?: () => void;
   onNextLevel?: () => void;
   onLevelSelect?: (index: number) => void;
-  onWalletConnect?: () => void;
+  onWalletConnect?: (networkId: string) => void;
   onWalletDisconnect?: () => void;
 
   constructor() {
@@ -126,7 +127,8 @@ export class HUD {
       if (target.id === "btn-replay") this.onLevelSelect?.(this.currentLevelIndex);
       if (target.id === "btn-play-again") this.onLevelSelect?.(0);
       if (target.id === "btn-wallet-connect") {
-        this.onWalletConnect?.();
+        const select = document.getElementById("network-select") as HTMLSelectElement | null;
+        this.onWalletConnect?.(select?.value ?? DEFAULT_NETWORK);
       }
       if (target.id === "btn-wallet-disconnect") {
         this.onWalletDisconnect?.();
@@ -253,8 +255,15 @@ export class HUD {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
     this.overlaySubtitle.textContent = "Connect your wallet to play";
+    const networkOptions = MIDNIGHT_NETWORKS.map(n =>
+      `<option value="${n.id}"${n.id === DEFAULT_NETWORK ? " selected" : ""}${!n.enabled ? " disabled" : ""}>${n.label}${!n.enabled ? " (coming soon)" : ""}</option>`
+    ).join("");
     this.overlayBtns.innerHTML = `
-      <button class="overlay-btn primary" id="btn-wallet-connect">Connect Midnight Wallet</button>
+      <div class="network-selector">
+        <label for="network-select">Network</label>
+        <select id="network-select">${networkOptions}</select>
+      </div>
+      <button class="overlay-btn primary" id="btn-wallet-connect">Connect Wallet</button>
     `;
     this.overlay.classList.remove("hidden");
   }
