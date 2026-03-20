@@ -32,6 +32,8 @@
  * RULE 17: Lattice walls must sit on a platform surface (not hover)
  * RULE 18: Lattice wall physics gap must align with visual gap
  * RULE 16: No obstacles or lattice walls on the first platform
+ * RULE 22: Finish platform can only touch one track element
+ *         - Prevents shortcuts by ensuring the end doesn't border earlier segments
  * RULE 19: Timed gates must be placed on platforms
  * RULE 20: Timed gates must sit on platform surface (not hovering)
  * RULE 21: Timed gates must be oriented perpendicular to the track
@@ -676,6 +678,76 @@ describe("Level playability", () => {
           touchingSources.size,
           `Start platform touches ${touchingSources.size} elements: ${[...touchingSources].join(", ")} — should only touch one`
         ).toBeLessThanOrEqual(1);
+      });
+
+      // RULE 22
+      it("finish platform only touches one track element", () => {
+        const segments = getWalkableSegments(level);
+        const fz = level.finishZone;
+        const finishBox: AABB = {
+          minX: fz.position[0] - fz.size[0] / 2, maxX: fz.position[0] + fz.size[0] / 2,
+          minY: 0, maxY: 100,
+          minZ: fz.position[2] - fz.size[2] / 2, maxZ: fz.position[2] + fz.size[2] / 2,
+        };
+
+        // Find the platform(s) under the finish zone
+        const finishPlatforms: number[] = [];
+        for (let j = 0; j < segments.length; j++) {
+          if (aabbOverlapXZ(segmentAABB(segments[j]), finishBox)) {
+            finishPlatforms.push(j);
+          }
+        }
+        if (finishPlatforms.length === 0) return; // caught by RULE 5
+
+        const pathCount = level.paths.length;
+        const bridgeCount = level.bridges?.length ?? 0;
+        const nonCurveCount = pathCount + bridgeCount;
+
+        const curveRanges: { start: number; end: number; idx: number }[] = [];
+        let offset = nonCurveCount;
+        if (level.curvedPaths) {
+          for (let c = 0; c < level.curvedPaths.length; c++) {
+            const count = curvedSegmentToAABBs(level.curvedPaths[c]).length;
+            curveRanges.push({ start: offset, end: offset + count, idx: c });
+            offset += count;
+          }
+        }
+
+        function sourceOf(j: number): string {
+          if (j < pathCount) return `path:${j}`;
+          if (j < nonCurveCount) return `bridge:${j - pathCount}`;
+          for (const r of curveRanges) {
+            if (j >= r.start && j < r.end) return `curve:${r.idx}`;
+          }
+          return `unknown:${j}`;
+        }
+
+        // For each finish platform, count how many distinct track elements it touches
+        for (const fp of finishPlatforms) {
+          const fpBox = segmentAABB(segments[fp]);
+          const fpSource = sourceOf(fp);
+          const touchingSources = new Set<string>();
+
+          for (let j = 0; j < segments.length; j++) {
+            if (j === fp) continue;
+            const src = sourceOf(j);
+            if (src === fpSource) continue; // same logical element (e.g. curve AABBs)
+            const box = segmentAABB(segments[j]);
+            const gap = horizontalGap(fpBox, box);
+            const heightDiff = Math.abs(topY(segments[fp]) - topY(segments[j]));
+            const hasBounce = segments[fp].surfaceType === SurfaceType.Bounce ||
+                              segments[j].surfaceType === SurfaceType.Bounce;
+            const maxHeight = hasBounce ? MAX_BOUNCE_HEIGHT : BALL_RADIUS + 0.5;
+            if (gap <= TOUCH_TOLERANCE && heightDiff <= maxHeight) {
+              touchingSources.add(src);
+            }
+          }
+
+          expect(
+            touchingSources.size,
+            `Finish platform (seg ${fp}) touches ${touchingSources.size} elements: ${[...touchingSources].join(", ")} — should only touch one`
+          ).toBeLessThanOrEqual(1);
+        }
       });
 
       // RULE 14
