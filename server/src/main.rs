@@ -40,7 +40,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(RateLimiter::new(rl_state.clone(), 60, 60))
+            .wrap(RateLimiter::new(rl_state.clone(), 300, 60))
             .app_data(db_data.clone())
             .app_data(app_state.clone())
             .configure(api::config)
