@@ -57,18 +57,25 @@ class Game {
     this.setupHUDCallbacks();
     this.setupLevelSelectKey();
 
-    // Check for existing player — wallet required
-    this.player = getPlayer();
-    if (this.player && this.player.wallet_address) {
-      if (this.player.auth_token) {
-        setAuthToken(this.player.auth_token);
-      }
-      this.showStartWithProgress();
+    // Guest mode — play without wallet
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("guest")) {
+      this.player = { id: 0, alias: "Guest" };
+      this.hud.showStartScreen(0, undefined, 0);
     } else {
-      // No wallet session — show connect screen
-      clearPlayer();
-      this.player = null;
-      this.hud.showWalletLogin();
+      // Check for existing player — wallet required
+      this.player = getPlayer();
+      if (this.player && this.player.wallet_address) {
+        if (this.player.auth_token) {
+          setAuthToken(this.player.auth_token);
+        }
+        this.showStartWithProgress();
+      } else {
+        // No wallet session — show connect screen
+        clearPlayer();
+        this.player = null;
+        this.hud.showWalletLogin();
+      }
     }
   }
 
