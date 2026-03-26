@@ -466,14 +466,14 @@ impl Db {
     }
 
     /// Resolve a player by wallet address or alias.
-    pub fn resolve_player_by_address(&self, address: &str) -> Result<Option<(i64, String, Option<String>)>> {
+    pub fn resolve_player_by_address(&self, address: &str) -> Result<Option<(i64, String, Option<String>, String)>> {
         let conn = self.conn.lock().unwrap();
 
         // Try wallet_address first
         let maybe = conn.query_row(
-            "SELECT id, alias, wallet_address FROM players WHERE wallet_address = ?1",
+            "SELECT id, alias, wallet_address, COALESCE(network_id, 'preview') FROM players WHERE wallet_address = ?1",
             params![address],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, String>(3)?)),
         );
         if let Ok(row) = maybe {
             return Ok(Some(row));
@@ -482,9 +482,9 @@ impl Db {
         // Try alias-based address
         if let Some(alias) = address.strip_prefix("alias:") {
             let maybe_alias = conn.query_row(
-                "SELECT id, alias, wallet_address FROM players WHERE alias = ?1",
+                "SELECT id, alias, wallet_address, COALESCE(network_id, 'preview') FROM players WHERE alias = ?1",
                 params![alias],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)),
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, String>(3)?)),
             );
             if let Ok(row) = maybe_alias {
                 return Ok(Some(row));
