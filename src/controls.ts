@@ -189,12 +189,17 @@ export class Controls {
     if (Math.abs(this.joystickInput.x) > 0.1 || Math.abs(this.joystickInput.y) > 0.1) {
       const jx = this.joystickInput.x;
       const jy = this.joystickInput.y;
+      // Normalize direction so diagonal joystick produces the same force
+      // magnitude as a single keyboard key (matching keyboard parity)
+      const mag = Math.sqrt(jx * jx + jy * jy);
+      const nx = jx / mag;
+      const ny = jy / mag;
       // Forward/back (screen Y maps to forward/back)
-      force.x += jy * sinA * moveForce;
-      force.z += jy * cosA * moveForce;
+      force.x += ny * sinA * moveForce;
+      force.z += ny * cosA * moveForce;
       // Left/right (screen X maps to strafe)
-      force.x += jx * cosA * moveForce;
-      force.z += jx * -sinA * moveForce;
+      force.x += nx * cosA * moveForce;
+      force.z += nx * -sinA * moveForce;
     }
 
     if (force.length() > 0) {
