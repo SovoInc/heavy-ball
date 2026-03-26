@@ -155,6 +155,8 @@ pub struct ChannelQuery {
     pub end_date: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    #[serde(rename = "minAchievements")]
+    pub min_achievements: Option<i64>,
     pub network_id: Option<String>,
 }
 
@@ -184,6 +186,10 @@ pub struct RankEntry {
 #[derive(Debug, Deserialize)]
 pub struct UserQuery {
     pub channel: Option<Vec<String>>,
+    #[serde(rename = "startDate")]
+    pub start_date: Option<String>,
+    #[serde(rename = "endDate")]
+    pub end_date: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -197,6 +203,8 @@ pub struct UserProfile {
 #[derive(Debug, Serialize)]
 pub struct Identity {
     pub address: String,
+    #[serde(rename = "delegatedFrom")]
+    pub delegated_from: Vec<String>,
     #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
 }

@@ -375,27 +375,29 @@ impl Db {
         Ok(count)
     }
 
-    /// Leaderboard channel: best total time across all levels (lower = better, ASC).
-    /// Score = negative total_time so that lower times rank higher with DESC sorting convention.
+    /// Leaderboard channel: most distinct levels completed per player.
     pub fn channel_leaderboard(
-        &self, start: &str, end: &str, limit: i64, offset: i64, network_id: &str,
+        &self, start: &str, end: &str, limit: i64, offset: i64, network_id: &str, min_achievements: Option<i64>,
     ) -> Result<(i64, f64, Vec<(String, Option<String>, f64)>)> {
         let conn = self.conn.lock().unwrap();
+        let min_ach = min_achievements.unwrap_or(0);
+        let ach_having_4 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?4";
+        let ach_having_6 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?6";
         let total_players: i64 = conn.query_row(
-            "SELECT COUNT(DISTINCT s.player_id) FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3",
-            params![start, end, network_id], |r| r.get(0),
+            &format!("SELECT COUNT(*) FROM (SELECT s.player_id FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", ach_having_4),
+            params![start, end, network_id, min_ach], |r| r.get(0),
         )?;
         let total_score: f64 = conn.query_row(
-            "SELECT COALESCE(SUM(levels), 0) FROM (SELECT COUNT(DISTINCT s.level) as levels FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id)",
-            params![start, end, network_id], |r| r.get(0),
+            &format!("SELECT COALESCE(SUM(levels), 0) FROM (SELECT COUNT(DISTINCT s.level) as levels FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", ach_having_4),
+            params![start, end, network_id, min_ach], |r| r.get(0),
         )?;
         let mut stmt = conn.prepare(
-            "SELECT COALESCE(p.wallet_address, 'alias:' || p.alias), COALESCE(p.wallet_address, p.alias), COUNT(DISTINCT s.level) as levels
+            &format!("SELECT COALESCE(p.wallet_address, 'alias:' || p.alias), COALESCE(p.wallet_address, p.alias), COUNT(DISTINCT s.level) as levels
              FROM scores s JOIN players p ON s.player_id = p.id
              WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?5
-             GROUP BY s.player_id ORDER BY levels DESC LIMIT ?3 OFFSET ?4",
+             GROUP BY s.player_id {} ORDER BY levels DESC LIMIT ?3 OFFSET ?4", ach_having_6),
         )?;
-        let rows = stmt.query_map(params![start, end, limit, offset, network_id], |row| {
+        let rows = stmt.query_map(params![start, end, limit, offset, network_id, min_ach], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, f64>(2)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok((total_players, total_score, rows))
@@ -403,30 +405,33 @@ impl Db {
 
     /// Cumulative channel: SUM of a column across all scores.
     pub fn channel_cumulative(
-        &self, column: &str, start: &str, end: &str, limit: i64, offset: i64, network_id: &str,
+        &self, column: &str, start: &str, end: &str, limit: i64, offset: i64, network_id: &str, min_achievements: Option<i64>,
     ) -> Result<(i64, f64, Vec<(String, Option<String>, f64)>)> {
         let conn = self.conn.lock().unwrap();
         let col = match column {
             "boxes_broken" | "power_ups_collected" | "speed_boosts" | "fall_count" => column,
             _ => return Ok((0, 0.0, vec![])),
         };
+        let min_ach = min_achievements.unwrap_or(0);
+        let ach_having_4 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?4";
+        let ach_having_6 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?6";
         let total_players: i64 = conn.query_row(
-            "SELECT COUNT(DISTINCT s.player_id) FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3",
-            params![start, end, network_id], |r| r.get(0),
+            &format!("SELECT COUNT(*) FROM (SELECT s.player_id FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", ach_having_4),
+            params![start, end, network_id, min_ach], |r| r.get(0),
         )?;
         let q_total = format!(
-            "SELECT COALESCE(SUM(s.{}), 0) FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3", col
+            "SELECT COALESCE(SUM(total), 0) FROM (SELECT SUM(s.{}) as total FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", col, ach_having_4
         );
-        let total_score: f64 = conn.query_row(&q_total, params![start, end, network_id], |r| r.get(0))?;
+        let total_score: f64 = conn.query_row(&q_total, params![start, end, network_id, min_ach], |r| r.get(0))?;
 
         let q = format!(
             "SELECT COALESCE(p.wallet_address, 'alias:' || p.alias), COALESCE(p.wallet_address, p.alias), SUM(s.{}) as total
              FROM scores s JOIN players p ON s.player_id = p.id
              WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?5
-             GROUP BY s.player_id ORDER BY total DESC LIMIT ?3 OFFSET ?4", col
+             GROUP BY s.player_id {} ORDER BY total DESC LIMIT ?3 OFFSET ?4", col, ach_having_6
         );
         let mut stmt = conn.prepare(&q)?;
-        let rows = stmt.query_map(params![start, end, limit, offset, network_id], |row| {
+        let rows = stmt.query_map(params![start, end, limit, offset, network_id, min_ach], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, f64>(2)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok((total_players, total_score, rows))
@@ -434,24 +439,27 @@ impl Db {
 
     /// Interactions channel: total levels completed per player.
     pub fn channel_interactions(
-        &self, start: &str, end: &str, limit: i64, offset: i64, network_id: &str,
+        &self, start: &str, end: &str, limit: i64, offset: i64, network_id: &str, min_achievements: Option<i64>,
     ) -> Result<(i64, f64, Vec<(String, Option<String>, f64)>)> {
         let conn = self.conn.lock().unwrap();
+        let min_ach = min_achievements.unwrap_or(0);
+        let ach_having_4 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?4";
+        let ach_having_6 = "HAVING (SELECT COUNT(*) FROM achievements WHERE player_id = s.player_id) >= ?6";
         let total_players: i64 = conn.query_row(
-            "SELECT COUNT(DISTINCT s.player_id) FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3",
-            params![start, end, network_id], |r| r.get(0),
+            &format!("SELECT COUNT(*) FROM (SELECT s.player_id FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", ach_having_4),
+            params![start, end, network_id, min_ach], |r| r.get(0),
         )?;
         let total_score: f64 = conn.query_row(
-            "SELECT CAST(COUNT(*) AS REAL) FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3",
-            params![start, end, network_id], |r| r.get(0),
+            &format!("SELECT COALESCE(SUM(cnt), 0) FROM (SELECT CAST(COUNT(*) AS REAL) as cnt FROM scores s JOIN players p ON s.player_id = p.id WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?3 GROUP BY s.player_id {})", ach_having_4),
+            params![start, end, network_id, min_ach], |r| r.get(0),
         )?;
         let mut stmt = conn.prepare(
-            "SELECT COALESCE(p.wallet_address, 'alias:' || p.alias), COALESCE(p.wallet_address, p.alias), CAST(COUNT(*) AS REAL) as completions
+            &format!("SELECT COALESCE(p.wallet_address, 'alias:' || p.alias), COALESCE(p.wallet_address, p.alias), CAST(COUNT(*) AS REAL) as completions
              FROM scores s JOIN players p ON s.player_id = p.id
              WHERE s.created_at >= ?1 AND s.created_at <= ?2 AND p.network_id = ?5
-             GROUP BY s.player_id ORDER BY completions DESC LIMIT ?3 OFFSET ?4",
+             GROUP BY s.player_id {} ORDER BY completions DESC LIMIT ?3 OFFSET ?4", ach_having_6),
         )?;
-        let rows = stmt.query_map(params![start, end, limit, offset, network_id], |row| {
+        let rows = stmt.query_map(params![start, end, limit, offset, network_id, min_ach], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, f64>(2)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok((total_players, total_score, rows))
