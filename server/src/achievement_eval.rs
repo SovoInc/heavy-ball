@@ -23,67 +23,60 @@ pub fn evaluate_achievements(
     let unlocked_keys: std::collections::HashSet<String> =
         already_unlocked.into_iter().map(|(k, _)| k).collect();
 
-    let defs: &[(&str, &str)] = &[
-        (FIRST_FINISH, "First Finish"),
-        (SPEED_DEMON, "Speed Demon"),
-        (BOX_SMASHER, "Box Smasher"),
-        (POWER_COLLECTOR, "Power Collector"),
-        (COMPLETIONIST, "Completionist"),
-        (NO_FALL, "No Fall"),
-        (SPEEDSTER, "Speedster"),
-        (FIRE_MAXED, "Overheated"),
-        (ICE_MAXED, "Frozen Solid"),
-    ];
-
     let mut newly_unlocked: Vec<(String, String)> = Vec::new();
 
-    for &(key, display) in defs {
-        if unlocked_keys.contains(key) {
+    for def in ACHIEVEMENTS {
+        if unlocked_keys.contains(def.name) {
             continue;
         }
 
-        let earned = match key {
-            // Complete any level
-            k if k == FIRST_FINISH => true,
+        let earned = match def.name {
+            FIRST_FINISH => true,
 
-            // Complete a level under 30 seconds
-            k if k == SPEED_DEMON => run.time_ms < 30_000,
+            GETTING_STARTED => {
+                db.player_levels_completed(player_id).unwrap_or(0) >= 10
+            }
 
-            // Break 50+ total boxes (cumulative across all runs)
-            k if k == BOX_SMASHER => {
+            SPEED_DEMON => run.time_ms < 10_000,
+
+            BOX_SMASHER => {
                 db.player_aggregate(player_id, "boxes_broken").unwrap_or(0) >= 50
             }
 
-            // Collect 25+ total power-ups (cumulative)
-            k if k == POWER_COLLECTOR => {
+            DEMOLITION_EXPERT => {
+                db.player_aggregate(player_id, "boxes_broken").unwrap_or(0) >= 200
+            }
+
+            POWER_COLLECTOR => {
                 db.player_aggregate(player_id, "power_ups_collected").unwrap_or(0) >= 25
             }
 
-            // Complete all 100 levels
-            k if k == COMPLETIONIST => {
+            HALFWAY_THERE => {
+                db.player_levels_completed(player_id).unwrap_or(0) >= 50
+            }
+
+            COMPLETIONIST => {
                 db.player_levels_completed(player_id).unwrap_or(0) >= 100
             }
 
-            // Complete a level without falling
-            k if k == NO_FALL => run.fall_count == 0,
+            NO_FALL => run.fall_count == 0,
 
-            // Use 10+ speed boosts (cumulative)
-            k if k == SPEEDSTER => {
-                db.player_aggregate(player_id, "speed_boosts").unwrap_or(0) >= 10
+            PERSISTENT => {
+                db.player_aggregate(player_id, "fall_count").unwrap_or(0) >= 100
             }
 
-            // Reach max fire buildup
-            k if k == FIRE_MAXED => run.fire_maxed,
+            FIRE_MAXED => run.fire_maxed,
 
-            // Reach max ice buildup (get frozen)
-            k if k == ICE_MAXED => run.ice_maxed,
+            ICE_MAXED => run.ice_maxed,
+
+            TEMPERED => run.fire_maxed && run.ice_maxed,
 
             _ => false,
         };
 
         if earned {
-            let _ = db.unlock_achievement(player_id, key);
-            newly_unlocked.push((key.to_string(), display.to_string()));
+            let _ = db.unlock_achievement(player_id, def.name);
+            newly_unlocked.push((def.name.to_string(), def.display_name.to_string()));
         }
     }
 

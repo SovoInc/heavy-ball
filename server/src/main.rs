@@ -1,7 +1,9 @@
 mod achievement_defs;
 mod achievement_eval;
+mod achievements_api;
 mod api;
 mod db;
+mod metrics_api;
 mod models;
 mod rate_limit;
 mod session;
@@ -44,6 +46,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(db_data.clone())
             .app_data(app_state.clone())
             .configure(api::config)
+            .configure(metrics_api::config)
+            .configure(achievements_api::config)
             .service(Files::new("/", "./static").index_file("index.html"))
     })
     .bind(("127.0.0.1", port))?
