@@ -39,7 +39,7 @@ const tpA = t.lastCenter();
 const yA = t.lastSurfaceY();
 
 // === Jump to new position (creates empty space) ===
-t.x += 30;
+t.x += 100;
 t.z = 2;
 t.heading = 0;
 

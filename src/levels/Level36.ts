@@ -15,7 +15,7 @@ t.straight(10);                                                               //
 const tp1A = t.lastCenter(); const y1A = t.lastSurfaceY();
 
 // === Jump to section 2 ===
-t.x += 30; t.z = 2; t.y = 0; t.heading = 0;
+t.x += 80; t.z = 2; t.y = 0; t.heading = 0;
 
 // === Section 2 (~34 units) ===
 t.straight(10);                                                               // telepad 1B here
@@ -29,7 +29,7 @@ t.straight(10);                                                               //
 const tp2A = t.lastCenter(); const y2A = t.lastSurfaceY();
 
 // === Jump to section 3 ===
-t.x += 50; t.z = 2; t.y = 0; t.heading = 0;
+t.x += 100; t.z = 2; t.y = 0; t.heading = 0;
 
 // === Section 3 (~34 units) ===
 t.straight(10);                                                               // telepad 2B here

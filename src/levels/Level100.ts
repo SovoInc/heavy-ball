@@ -64,7 +64,7 @@ const tp1A = t.lastCenter(); const y1A = t.lastSurfaceY();
 // === Section 2 (~170 units, 4 curves): Speed, Crumbling, Magnet, bounce drop
 // ═══════════════════════════════════════════════════════════════════
 
-t.x = 100; t.z = 200; t.y = 0; t.heading = 0;
+t.x = 200; t.z = 200; t.y = 0; t.heading = 0;
 
 t.straight(10);                                                               // telepad 1B here
 const tp1B = t.lastCenter(); const y1B = t.lastSurfaceY();
@@ -111,7 +111,7 @@ const tp2A = t.lastCenter(); const y2A = t.lastSurfaceY();
 // === Section 3 (~170 units, 4 curves): Invisible, all hazard mix, bounce drop
 // ═══════════════════════════════════════════════════════════════════
 
-t.x = 200; t.z = 400; t.y = 0; t.heading = 0;
+t.x = 400; t.z = 400; t.y = 0; t.heading = 0;
 
 t.straight(10);                                                               // telepad 2B here
 const tp2B = t.lastCenter(); const y2B = t.lastSurfaceY();

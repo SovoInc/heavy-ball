@@ -35,6 +35,9 @@
  * RULE 16: No obstacles or lattice walls on the first platform
  * RULE 22: Finish platform can only touch one track element
  *         - Prevents shortcuts by ensuring the end doesn't border earlier segments
+ * RULE 23: Teleport sections must not overlap
+ *         - Platforms before a teleport must not touch or overlap platforms after it
+ *         - Prevents skipping sections by rolling between teleport-separated areas
  * RULE 19: Timed gates must be placed on platforms
  * RULE 20: Timed gates must sit on platform surface (not hovering)
  * RULE 21: Timed gates must be oriented perpendicular to the track
@@ -1063,6 +1066,68 @@ describe("Level playability", () => {
           maxW / minW,
           `widths range from ${minW} to ${maxW} (ratio ${(maxW / minW).toFixed(1)}×, max 4×)`
         ).toBeLessThanOrEqual(4);
+      });
+
+      // RULE 23
+      it("teleport sections must not overlap", () => {
+        if (!level.teleportPairs || level.teleportPairs.length === 0) return;
+
+        const segments = getWalkableSegments(level);
+        const MIN_GAP = 1.0;
+
+        // Build connected components via physical adjacency (no teleports).
+        const componentOf = new Int32Array(segments.length).fill(-1);
+        let numComponents = 0;
+
+        for (let i = 0; i < segments.length; i++) {
+          if (componentOf[i] >= 0) continue;
+          const id = numComponents++;
+          const queue = [i];
+          componentOf[i] = id;
+          while (queue.length > 0) {
+            const cur = queue.shift()!;
+            const curBox = segmentAABB(segments[cur]);
+            for (let j = 0; j < segments.length; j++) {
+              if (componentOf[j] >= 0) continue;
+              const jBox = segmentAABB(segments[j]);
+              if (horizontalGap(curBox, jBox) <= TOUCH_TOLERANCE) {
+                componentOf[j] = id;
+                queue.push(j);
+              }
+            }
+          }
+        }
+
+        // For each teleport pair, pad A and pad B must be in DIFFERENT components.
+        // If they're in the same component, sections are physically connected (the bug).
+        const violations: string[] = [];
+        for (const pair of level.teleportPairs!) {
+          const aIdx = findSegmentAt(pair.a[0], pair.a[2], segments);
+          const bIdx = findSegmentAt(pair.b[0], pair.b[2], segments);
+          if (aIdx < 0 || bIdx < 0) continue;
+          if (componentOf[aIdx] === componentOf[bIdx]) {
+            violations.push(
+              `teleport pad A (seg ${aIdx}) and pad B (seg ${bIdx}) are in the same ` +
+              `physical component — sections overlap and players can skip via rolling`
+            );
+          }
+        }
+
+        // Also check that distinct components maintain MIN_GAP between them.
+        for (let i = 0; i < segments.length; i++) {
+          for (let j = i + 1; j < segments.length; j++) {
+            if (componentOf[i] === componentOf[j]) continue;
+            const gap = horizontalGap(segmentAABB(segments[i]), segmentAABB(segments[j]));
+            if (gap < MIN_GAP) {
+              violations.push(
+                `component ${componentOf[i] + 1} seg ${i} and component ${componentOf[j] + 1} seg ${j} ` +
+                `are too close (gap=${gap.toFixed(2)}, min=${MIN_GAP})`
+              );
+            }
+          }
+        }
+
+        expect(violations, violations.join("\n")).toHaveLength(0);
       });
     });
   });
