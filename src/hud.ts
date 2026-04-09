@@ -75,6 +75,7 @@ export class HUD {
   onLevelSelect?: (index: number) => void;
   onWalletConnect?: (networkId: string) => void;
   onWalletDisconnect?: () => void;
+  onDemo?: () => void;
 
   constructor() {
     this.levelEl = document.getElementById("hud-level")!;
@@ -132,6 +133,9 @@ export class HUD {
       }
       if (target.id === "btn-wallet-disconnect") {
         this.onWalletDisconnect?.();
+      }
+      if (target.id === "btn-demo") {
+        this.onDemo?.();
       }
       if (target.id === "btn-leaderboard") {
         this.toggleLeaderboard(parseInt(target.dataset.level ?? "1"));
@@ -264,6 +268,7 @@ export class HUD {
         <select id="network-select">${networkOptions}</select>
       </div>
       <button class="overlay-btn primary" id="btn-wallet-connect">Connect Wallet</button>
+      <button class="overlay-btn secondary" id="btn-demo">Demo</button>
     `;
     this.overlay.classList.remove("hidden");
   }
