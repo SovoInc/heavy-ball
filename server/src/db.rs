@@ -214,17 +214,17 @@ impl Db {
         )
     }
 
-    pub fn top_scores(&self, level: i64, limit: i64) -> Result<Vec<(String, Option<String>, i64, i64)>> {
+    pub fn top_scores(&self, level: i64, limit: i64, network_id: &str) -> Result<Vec<(String, Option<String>, i64, i64)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT COALESCE(p.wallet_address, p.alias), p.wallet_address, MIN(s.time_ms) as best_time, s.player_id
              FROM scores s JOIN players p ON s.player_id = p.id
-             WHERE s.level = ?1
+             WHERE s.level = ?1 AND p.network_id = ?3
              GROUP BY s.player_id
              ORDER BY best_time ASC
              LIMIT ?2",
         )?;
-        let rows = stmt.query_map(params![level, limit], |row| {
+        let rows = stmt.query_map(params![level, limit, network_id], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok(rows)
@@ -255,7 +255,7 @@ impl Db {
         Ok("ok".to_string())
     }
 
-    pub fn global_leaderboard(&self, limit: i64) -> Result<Vec<(String, Option<String>, i64, i64, i64)>> {
+    pub fn global_leaderboard(&self, limit: i64, network_id: &str) -> Result<Vec<(String, Option<String>, i64, i64, i64)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT COALESCE(p.wallet_address, p.alias), p.wallet_address, p.id, sub.max_level, sub.total_time
@@ -263,9 +263,10 @@ impl Db {
                SELECT player_id, MAX(level) as max_level,
                       SUM(best_time) as total_time
                FROM (
-                 SELECT player_id, level, MIN(time_ms) as best_time
-                 FROM scores
-                 GROUP BY player_id, level
+                 SELECT s.player_id, s.level, MIN(s.time_ms) as best_time
+                 FROM scores s JOIN players p2 ON s.player_id = p2.id
+                 WHERE p2.network_id = ?2
+                 GROUP BY s.player_id, s.level
                )
                GROUP BY player_id
              ) sub
@@ -273,7 +274,7 @@ impl Db {
              ORDER BY sub.max_level DESC, sub.total_time ASC
              LIMIT ?1"
         )?;
-        let rows = stmt.query_map(params![limit], |row| {
+        let rows = stmt.query_map(params![limit, network_id], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok(rows)

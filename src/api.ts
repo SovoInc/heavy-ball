@@ -119,8 +119,8 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export function shortenWalletAddress(value: string): string {
-  if (value.length <= 14) return value;
-  return `${value.slice(0, 3)}...${value.slice(-8)}`;
+  if (value.length <= 24) return value;
+  return `${value.slice(0, 16)}...${value.slice(-8)}`;
 }
 
 export function getDisplayName(entry: { alias?: string; display_name?: string; wallet_address?: string | null }): string {
@@ -140,8 +140,8 @@ export const api = {
     return post<ScoreResult>("/api/scores", { session_token: sessionToken, score_token: scoreToken });
   },
 
-  getTopScores: (level: number, limit = 20) =>
-    get<ScoreEntry[]>(`/api/scores/top?level=${level}&limit=${limit}`),
+  getTopScores: (level: number, limit = 20, networkId?: string) =>
+    get<ScoreEntry[]>(`/api/scores/top?level=${level}&limit=${limit}${networkId ? `&network_id=${networkId}` : ""}`),
 
   getPlayerStats: (playerId: number) =>
     get<PlayerStatsData>(`/api/stats/player/${playerId}`),
@@ -149,8 +149,8 @@ export const api = {
   getPlayerAchievements: (playerId: number) =>
     get<AchievementEntry[]>(`/api/achievements/${playerId}`),
 
-  getLeaderboard: (limit = 20) =>
-    get<LeaderboardEntry[]>(`/api/leaderboard?limit=${limit}`),
+  getLeaderboard: (limit = 20, networkId?: string) =>
+    get<LeaderboardEntry[]>(`/api/leaderboard?limit=${limit}${networkId ? `&network_id=${networkId}` : ""}`),
 
   getProgress: (playerId: number) =>
     get<PlayerProgress>(`/api/progress/${playerId}`),
