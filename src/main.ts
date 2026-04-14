@@ -14,7 +14,7 @@ import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
 import { api, setAuthToken, shortenWalletAddress } from "./api";
 import { getPlayer, setPlayer, clearPlayer, type PlayerState } from "./player";
-import { hasMidnightWallet, connectMidnightWallet, getMidnightWalletError, type MidnightNetworkId } from "./midnight";
+import { hasMidnightWallet, connectMidnightWallet, watchWalletSync, getMidnightWalletError } from "./midnight";
 
 type GameState = "menu" | "playing" | "levelComplete" | "allComplete";
 
@@ -63,6 +63,7 @@ class Game {
       if (this.player.auth_token) {
         setAuthToken(this.player.auth_token);
       }
+      this.hud.networkId = this.player.network_id ?? "";
       this.showStartWithProgress();
     } else {
       // No wallet session — show connect screen
@@ -136,11 +137,20 @@ class Game {
   }
 
   private setupHUDCallbacks() {
-    this.hud.onWalletConnect = async (networkId: string) => {
+    this.hud.onWalletConnect = async () => {
       this.hud.showWalletConnecting();
-      const network = networkId as MidnightNetworkId;
       try {
-        const connection = await connectMidnightWallet(network);
+        const connection = await connectMidnightWallet();
+        const network = connection.networkId;
+        this.hud.networkId = network;
+        this.hud.showWalletNetwork(network);
+
+        // Wait for wallet to sync with the network before registering
+        this.hud.showWalletSyncing(0);
+        await watchWalletSync(connection.connectedApi, (pct) => {
+          this.hud.showWalletSyncing(pct);
+        });
+
         const data = await api.registerWallet(connection.address, network);
         this.player = {
           id: data.id,
@@ -155,7 +165,7 @@ class Game {
         setPlayer(this.player);
         await this.showStartWithProgress();
       } catch (err) {
-        this.hud.showWalletError(getMidnightWalletError(err, network));
+        this.hud.showWalletError(getMidnightWalletError(err));
       }
     };
 

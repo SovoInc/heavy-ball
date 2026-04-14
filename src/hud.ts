@@ -1,7 +1,7 @@
 import { PowerUpType } from "./powerups/PowerUpType";
 import { CONFIG } from "./config";
 import { api, type ScoreEntry, type LeaderboardEntry, type AchievementEntry, getDisplayName } from "./api";
-import { MIDNIGHT_NETWORKS, DEFAULT_NETWORK } from "./midnight";
+import "./midnight";
 
 const ACHIEVEMENT_DEFS: Record<string, { name: string; desc: string; icon: string }> = {
   first_finish:   { name: "First Finish",    desc: "Complete any level",                  icon: "\u{1F3C1}" },
@@ -68,12 +68,13 @@ export class HUD {
   private running = false;
   private toastTimeout: ReturnType<typeof setTimeout> | null = null;
   private currentLevelIndex = 0;
+  networkId = "";
 
   onGiveUp?: () => void;
   onStart?: () => void;
   onNextLevel?: () => void;
   onLevelSelect?: (index: number) => void;
-  onWalletConnect?: (networkId: string) => void;
+  onWalletConnect?: () => void;
   onWalletDisconnect?: () => void;
   onDemo?: () => void;
 
@@ -128,8 +129,7 @@ export class HUD {
       if (target.id === "btn-replay") this.onLevelSelect?.(this.currentLevelIndex);
       if (target.id === "btn-play-again") this.onLevelSelect?.(0);
       if (target.id === "btn-wallet-connect") {
-        const select = document.getElementById("network-select") as HTMLSelectElement | null;
-        this.onWalletConnect?.(select?.value ?? DEFAULT_NETWORK);
+        this.onWalletConnect?.();
       }
       if (target.id === "btn-wallet-disconnect") {
         this.onWalletDisconnect?.();
@@ -259,14 +259,8 @@ export class HUD {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
     this.overlaySubtitle.textContent = "Connect your wallet to play";
-    const networkOptions = MIDNIGHT_NETWORKS.map(n =>
-      `<option value="${n.id}"${n.id === DEFAULT_NETWORK ? " selected" : ""}${!n.enabled ? " disabled" : ""}>${n.label}${!n.enabled ? " (coming soon)" : ""}</option>`
-    ).join("");
     this.overlayBtns.innerHTML = `
-      <div class="network-selector">
-        <label for="network-select">Network</label>
-        <select id="network-select">${networkOptions}</select>
-      </div>
+      <div class="network-badge" style="text-align:center;font-size:11px;color:rgba(200,210,230,0.5);letter-spacing:1px;margin-bottom:4px"></div>
       <button class="overlay-btn primary" id="btn-wallet-connect">Connect Wallet</button>
       <button class="overlay-btn secondary" id="btn-demo">Demo</button>
     `;
@@ -277,6 +271,20 @@ export class HUD {
     const btn = document.getElementById("btn-wallet-connect");
     if (btn) {
       btn.textContent = "Connecting...";
+      (btn as HTMLButtonElement).disabled = true;
+    }
+  }
+
+  showWalletNetwork(network: string) {
+    const badge = document.querySelector(".network-badge");
+    if (badge) badge.textContent = network;
+  }
+
+  showWalletSyncing(pct: number) {
+    this.overlaySubtitle.textContent = "Your wallet is syncing";
+    const btn = document.getElementById("btn-wallet-connect");
+    if (btn) {
+      btn.textContent = pct < 100 ? `${pct}%` : "...";
       (btn as HTMLButtonElement).disabled = true;
     }
   }
@@ -324,18 +332,22 @@ export class HUD {
       ? `<button class="overlay-btn secondary" id="btn-achievements" data-player-id="${playerId}">Achievements</button>`
       : "";
 
+    const leaderboardBtn = this.networkId
+      ? `<button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>`
+      : "";
+
     if (continueLevel > 0) {
       this.overlayBtns.innerHTML = `
         <button class="overlay-btn primary" id="btn-continue" data-level="${continueLevel}">Continue &mdash; Level ${continueLevel + 1}</button>
         <button class="overlay-btn secondary" id="btn-start">New Game</button>
-        <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${leaderboardBtn}
         ${achievementsBtn}
         ${logoutBtn}
       `;
     } else {
       this.overlayBtns.innerHTML = `
         <button class="overlay-btn primary" id="btn-start">Play</button>
-        <button class="overlay-btn secondary" id="btn-highscores">Leaderboard</button>
+        ${leaderboardBtn}
         ${achievementsBtn}
         ${logoutBtn}
       `;
@@ -515,7 +527,7 @@ export class HUD {
     this.showLeaderboardView();
 
     try {
-      const entries = await api.getLeaderboard(20);
+      const entries = await api.getLeaderboard(20, this.networkId || undefined);
       if (entries.length === 0) {
         this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>No scores yet</p>";
         return;
@@ -550,7 +562,7 @@ export class HUD {
     this.showLeaderboardView();
 
     try {
-      const scores = await api.getTopScores(level, 20);
+      const scores = await api.getTopScores(level, 20, this.networkId || undefined);
       if (scores.length === 0) {
         this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>No scores yet</p>";
         return;
