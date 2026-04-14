@@ -258,7 +258,7 @@ export class HUD {
   showWalletLogin() {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
-    this.overlaySubtitle.textContent = "Connect your wallet to play";
+    this.overlaySubtitle.textContent = "Connect your Midnight wallet to play";
     this.overlayBtns.innerHTML = `
       <div class="network-badge" style="text-align:center;font-size:11px;color:rgba(200,210,230,0.5);letter-spacing:1px;margin-bottom:4px"></div>
       <button class="overlay-btn primary" id="btn-wallet-connect">Connect Wallet</button>
