@@ -36,15 +36,18 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 }
 
 fn is_valid_wallet_address(addr: &str) -> bool {
-    // Midnight shielded addresses: "mn_shield-addr_" prefix + network + hex/bech32 body
+    // Midnight shielded addresses: testnet "mn_shield-addr_" or mainnet Bech32m "mn_shield-addr1"
     // Minimum realistic length ~40, max ~200
     if addr.len() < 40 || addr.len() > 200 {
         return false;
     }
-    if !addr.starts_with("mn_shield-addr_") {
+    let body = if let Some(b) = addr.strip_prefix("mn_shield-addr_") {
+        b
+    } else if let Some(b) = addr.strip_prefix("mn_shield-addr1") {
+        b
+    } else {
         return false;
-    }
-    let body = &addr["mn_shield-addr_".len()..];
+    };
     body.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
@@ -124,7 +127,7 @@ async fn post_wallet(db: web::Data<Db>, body: web::Json<WalletRequest>) -> HttpR
     if !is_valid_wallet_address(wallet_address) {
         return HttpResponse::BadRequest().body("invalid wallet address format");
     }
-    let network_id = if body.network_id.is_empty() { "preview" } else { &body.network_id };
+    let network_id = if body.network_id.is_empty() { "mainnet" } else { &body.network_id };
 
     match db.upsert_wallet(wallet_address, network_id) {
         Ok((id, alias, wallet, net)) => {
@@ -227,7 +230,8 @@ async fn post_score(req: HttpRequest, db: web::Data<Db>, app: web::Data<AppState
 async fn get_top_scores(db: web::Data<Db>, query: web::Query<LevelQuery>) -> HttpResponse {
     let level = query.level.unwrap_or(1);
     let limit = query.limit.unwrap_or(20).min(100);
-    match db.top_scores(level, limit) {
+    let network_id = query.network_id.as_deref().unwrap_or("mainnet");
+    match db.top_scores(level, limit, network_id) {
         Ok(rows) => {
             let entries: Vec<ScoreEntry> = rows.into_iter().enumerate().map(|(i, (display_name, wallet_address, time_ms, pid))| {
                 let alias = display_name.clone();
@@ -257,7 +261,8 @@ async fn get_player_stats(req: HttpRequest, db: web::Data<Db>, path: web::Path<i
 
 async fn get_leaderboard(db: web::Data<Db>, query: web::Query<LeaderboardQuery>) -> HttpResponse {
     let limit = query.limit.unwrap_or(20).min(100);
-    match db.global_leaderboard(limit) {
+    let network_id = query.network_id.as_deref().unwrap_or("mainnet");
+    match db.global_leaderboard(limit, network_id) {
         Ok(rows) => {
             let entries: Vec<LeaderboardEntry> = rows.into_iter().enumerate().map(|(i, (display_name, wallet_address, pid, max_level, total_time))| {
                 let alias = display_name.clone();
