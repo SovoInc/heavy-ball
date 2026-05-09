@@ -2,6 +2,7 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { CONFIG } from "../config";
 import { Physics } from "../physics";
+import { createRoundedBar, createSciFiMaterial } from "./visuals";
 
 export interface LatticeWallDef {
   position: [number, number, number];
@@ -30,10 +31,12 @@ export class LatticeWall {
     this.group = new THREE.Group();
 
     const barThickness = 0.08;
-    const barMat = new THREE.MeshStandardMaterial({
+    const barMat = createSciFiMaterial({
       color: CONFIG.colors.latticeWall,
-      metalness: 0.6,
-      roughness: 0.3,
+      emissive: 0x223344,
+      emissiveIntensity: 0.28,
+      metalness: 0.65,
+      roughness: 0.26,
     });
 
     const sections = this.computeSections(width, gapSide, gapWidth);
@@ -118,20 +121,16 @@ export class LatticeWall {
     // vertical bars
     for (let c = 0; c < cols; c++) {
       const x = -w / 2 + c * spacingX + offsetX;
-      const geo = new THREE.BoxGeometry(bar, h, bar);
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = createRoundedBar(bar, h, bar, mat, bar * 0.4);
       mesh.position.set(x, centerY, 0);
-      mesh.castShadow = true;
       this.group.add(mesh);
     }
 
     // horizontal bars
     for (let r = 0; r < rows; r++) {
       const y = centerY - h / 2 + r * spacingY;
-      const geo = new THREE.BoxGeometry(w, bar, bar);
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = createRoundedBar(w, bar, bar, mat, bar * 0.4);
       mesh.position.set(offsetX, y, 0);
-      mesh.castShadow = true;
       this.group.add(mesh);
     }
 
@@ -145,12 +144,8 @@ export class LatticeWall {
       [offsetX, centerY - h / 2, w + frameBar, frameBar],
     ];
     for (const [x, y, fw, fh] of topBot) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(fw, fh, frameBar),
-        frameMat,
-      );
+      const mesh = createRoundedBar(fw, fh, frameBar, frameMat, frameBar * 0.35);
       mesh.position.set(x, y, 0);
-      mesh.castShadow = true;
       this.group.add(mesh);
     }
 
@@ -159,12 +154,8 @@ export class LatticeWall {
       [offsetX + w / 2, centerY],
     ];
     for (const [x, y] of leftRight) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(frameBar, h, frameBar),
-        frameMat,
-      );
+      const mesh = createRoundedBar(frameBar, h, frameBar, frameMat, frameBar * 0.35);
       mesh.position.set(x, y, 0);
-      mesh.castShadow = true;
       this.group.add(mesh);
     }
   }

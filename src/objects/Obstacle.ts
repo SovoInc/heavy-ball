@@ -3,6 +3,13 @@ import * as CANNON from "cannon-es";
 import { Physics } from "../physics";
 import { PowerUpType } from "../powerups/PowerUpType";
 import { CONFIG } from "../config";
+import {
+  createEnergyMaterial,
+  createRoundedBar,
+  createRoundedBoxGeometry,
+  createRoundedPanel,
+  createSciFiMaterial,
+} from "./visuals";
 
 export interface ObstacleDef {
   position: [number, number, number];
@@ -37,6 +44,7 @@ export class Obstacle {
   private origin: [number, number, number];
   private time = 0;
   private material: THREE.MeshStandardMaterial;
+  private glowMaterial: THREE.MeshStandardMaterial | null = null;
 
   constructor(scene: THREE.Scene, physics: Physics, def: ObstacleDef) {
     const [w, h, d] = def.size;
@@ -52,11 +60,11 @@ export class Obstacle {
     this.color = baseColor;
     this.size = def.size;
 
-    const geo = new THREE.BoxGeometry(w, h, d);
-    this.material = new THREE.MeshStandardMaterial({
+    const geo = createRoundedBoxGeometry(w, h, d, Math.min(0.16, w * 0.16, h * 0.16, d * 0.16), 5);
+    this.material = createSciFiMaterial({
       color: baseColor,
-      roughness: def.powerUp ? 0.3 : 0.7,
-      metalness: def.powerUp ? 0.5 : 0.2,
+      roughness: def.powerUp ? 0.26 : 0.5,
+      metalness: def.powerUp ? 0.55 : 0.32,
       emissive: def.powerUp ? baseColor : 0x000000,
       emissiveIntensity: def.powerUp ? 0.3 : 0,
     });
@@ -65,6 +73,7 @@ export class Obstacle {
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
     if (def.rotation) this.mesh.rotation.y = def.rotation;
+    this.addVisualDetails(w, h, d, baseColor, !!def.powerUp);
     scene.add(this.mesh);
 
     this.body = new CANNON.Body({
@@ -108,7 +117,43 @@ export class Obstacle {
 
     // Pulsing glow for power-up boxes
     if (this.powerUpType) {
-      this.material.emissiveIntensity = 0.3 + Math.sin(this.time * 4) * 0.2;
+      const pulse = 0.3 + Math.sin(this.time * 4) * 0.2;
+      this.material.emissiveIntensity = pulse;
+      if (this.glowMaterial) this.glowMaterial.emissiveIntensity = 0.8 + Math.sin(this.time * 4) * 0.35;
+    }
+  }
+
+  private addVisualDetails(w: number, h: number, d: number, color: number, isPowerUp: boolean) {
+    const panel = createRoundedPanel(
+      Math.max(0.2, w * 0.72),
+      Math.max(0.2, d * 0.72),
+      new THREE.Color(color).lerp(new THREE.Color(0xffffff), isPowerUp ? 0.24 : 0.12).getHex(),
+      isPowerUp ? color : 0x000000,
+      isPowerUp ? 0.78 : 0.55,
+    );
+    panel.position.y = h / 2 + 0.018;
+    this.mesh.add(panel);
+
+    const bandMat = createSciFiMaterial({
+      color: isPowerUp ? color : 0x8a7764,
+      emissive: isPowerUp ? color : 0x120c08,
+      emissiveIntensity: isPowerUp ? 0.55 : 0.18,
+      roughness: 0.38,
+      metalness: 0.45,
+    });
+    const band = createRoundedBar(Math.max(0.25, w * 0.82), 0.045, Math.max(0.05, d * 0.08), bandMat, 0.025);
+    band.position.set(0, h * 0.08, d / 2 + 0.012);
+    this.mesh.add(band);
+
+    if (isPowerUp) {
+      this.glowMaterial = createEnergyMaterial(color, 0.35, 0.9);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(Math.min(w, d) * 0.22, Math.min(w, d) * 0.34, 40),
+        this.glowMaterial,
+      );
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = h / 2 + 0.045;
+      this.mesh.add(glow);
     }
   }
 }

@@ -9,23 +9,32 @@ export interface WindZoneDef {
   strength: number;
 }
 
-const LEAF_COUNT = 40;
+const LEAF_COUNT = 48;
 
 function createLeafTexture(): THREE.CanvasTexture {
-  const size = 16;
+  const size = 32;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, size, size);
 
-  // Simple leaf shape — an ellipse with a slight taper
-  ctx.fillStyle = "#66aa44";
+  const gradient = ctx.createLinearGradient(4, 16, 28, 16);
+  gradient.addColorStop(0, "rgba(120, 220, 255, 0)");
+  gradient.addColorStop(0.35, "rgba(150, 240, 255, 0.85)");
+  gradient.addColorStop(1, "rgba(120, 160, 255, 0)");
+
+  // Compact streak sprite for sci-fi wind flow.
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.ellipse(8, 8, 6, 3, Math.PI / 6, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(4, 16);
+  ctx.lineTo(28, 16);
+  ctx.stroke();
 
   const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
@@ -78,11 +87,12 @@ export class WindZone {
 
     const mat = new THREE.PointsMaterial({
       map: getLeafTexture(),
-      size: 0.3,
+      color: 0x99ddff,
+      size: 0.45,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.78,
       depthWrite: false,
-      blending: THREE.NormalBlending,
+      blending: THREE.AdditiveBlending,
       sizeAttenuation: true,
     });
 

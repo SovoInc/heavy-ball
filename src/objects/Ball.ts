@@ -18,9 +18,11 @@ export class Ball {
     const texture = Ball.createLogoTexture();
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      metalness: 0.3,
-      roughness: 0.4,
+      metalness: 0.48,
+      roughness: 0.3,
       map: texture,
+      emissive: 0x111a24,
+      emissiveIntensity: 0.16,
     });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.castShadow = true;
@@ -99,6 +101,22 @@ export class Ball {
     // Black base
     c.fillStyle = "#111111";
     c.fillRect(0, 0, size, size);
+
+    // Subtle panel lines so the ball reads as a polished game object.
+    c.strokeStyle = "rgba(120, 170, 220, 0.16)";
+    c.lineWidth = 2;
+    for (let x = 0; x <= size; x += 64) {
+      c.beginPath();
+      c.moveTo(x, 0);
+      c.lineTo(x, size);
+      c.stroke();
+    }
+    for (let y = 64; y < size; y += 96) {
+      c.beginPath();
+      c.moveTo(0, y);
+      c.lineTo(size, y);
+      c.stroke();
+    }
 
     // Three white squares in a vertical line.
     // Sphere UV: width = 2π, height = π. At latitude θ, one horizontal pixel

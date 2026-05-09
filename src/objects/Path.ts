@@ -2,6 +2,16 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { CONFIG } from "../config";
 import { Physics } from "../physics";
+import {
+  createCrackTexture,
+  createEnergyMaterial,
+  createRoundedBar,
+  createRoundedBoxGeometry,
+  createRoundedPanel,
+  createSciFiMaterial,
+  getFireSpriteTexture,
+  getSnowflakeSpriteTexture,
+} from "./visuals";
 
 export enum SurfaceType {
   Normal = "normal",
@@ -36,17 +46,22 @@ function createArrowTexture(): THREE.CanvasTexture {
 
   ctx.clearRect(0, 0, size, size);
 
-  // Draw two chevron arrows pointing up (will be rotated to match direction)
-  ctx.strokeStyle = "#6688ff";
-  ctx.lineWidth = 6;
+  const gradient = ctx.createLinearGradient(0, 0, 0, size);
+  gradient.addColorStop(0, "rgba(120, 180, 255, 0)");
+  gradient.addColorStop(0.45, "rgba(125, 205, 255, 0.9)");
+  gradient.addColorStop(1, "rgba(90, 130, 255, 0)");
+
+  // Draw stacked sci-fi chevrons pointing up (rotated per speed direction).
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = 8;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  for (const yOff of [20, 72]) {
+  for (const yOff of [16, 60, 104]) {
     ctx.beginPath();
-    ctx.moveTo(28, yOff + 28);
+    ctx.moveTo(24, yOff + 26);
     ctx.lineTo(64, yOff);
-    ctx.lineTo(100, yOff + 28);
+    ctx.lineTo(104, yOff + 26);
     ctx.stroke();
   }
 
@@ -60,6 +75,12 @@ let sharedArrowTexture: THREE.CanvasTexture | null = null;
 function getArrowTexture(): THREE.CanvasTexture {
   if (!sharedArrowTexture) sharedArrowTexture = createArrowTexture();
   return sharedArrowTexture;
+}
+
+let sharedCrackTexture: THREE.CanvasTexture | null = null;
+function getCrackTexture(): THREE.CanvasTexture {
+  if (!sharedCrackTexture) sharedCrackTexture = createCrackTexture();
+  return sharedCrackTexture;
 }
 
 export class PathSegment {
@@ -90,9 +111,13 @@ export class PathSegment {
   private arrowMesh: THREE.Mesh | null = null;
   private arrowMaterial: THREE.MeshBasicMaterial | null = null;
   private fireParticles: THREE.Points | null = null;
-  private fireData: { y: number; phase: number; speed: number; baseX: number; baseZ: number }[] = [];
+  private fireData: { y: number; phase: number; speed: number; wobble: number; baseX: number; baseZ: number; lifeMax: number }[] = [];
+  private fireTopY = 0;
+  private fireRise = 1.4;
   private frostParticles: THREE.Points | null = null;
-  private frostData: { phase: number; baseX: number; baseY: number; baseZ: number }[] = [];
+  private frostData: { y: number; speed: number; baseX: number; baseZ: number; swayPhase: number; swaySpeed: number; swayAmp: number; size: number }[] = [];
+  private snowTopY = 0;
+  private snowBottomY = 0;
   private magnetParticles: THREE.Points | null = null;
   private magnetData: { angle: number; r: number; speed: number }[] = [];
 
@@ -166,15 +191,17 @@ export class PathSegment {
       this.invisibleOffTime = def.invisible.offTime;
     }
 
-    const geo = new THREE.BoxGeometry(w, h, d);
-    this.material = new THREE.MeshStandardMaterial({
+    const platformRadius = Math.min(0.28, w * 0.08, d * 0.08, h * 0.45);
+    const geo = createRoundedBoxGeometry(w, h, d, platformRadius, 5);
+    this.material = createSciFiMaterial({
       color,
-      roughness: this.surfaceType === SurfaceType.Ice ? 0.1 : 0.8,
-      metalness: this.surfaceType === SurfaceType.Ice ? 0.6 : 0.1,
+      roughness: this.surfaceType === SurfaceType.Ice ? 0.16 : this.surfaceType === SurfaceType.Lava ? 0.42 : 0.58,
+      metalness: this.surfaceType === SurfaceType.Ice ? 0.55 : this.surfaceType === SurfaceType.Lava ? 0.08 : 0.28,
       emissive,
       emissiveIntensity,
       transparent,
       opacity,
+      map: this.surfaceType === SurfaceType.Crumbling ? getCrackTexture() : undefined,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.position.set(px, py, pz);
@@ -184,6 +211,7 @@ export class PathSegment {
       this.mesh.rotation.y = def.rotation;
     }
     this.originalPosition = this.mesh.position.clone();
+    this.addPlatformAccents(w, h, d, color, emissive, isBridge);
     scene.add(this.mesh);
 
     // Add animated arrow overlay for speed surfaces
@@ -230,30 +258,32 @@ export class PathSegment {
 
     // Add fire particles for lava surfaces
     if (this.surfaceType === SurfaceType.Lava) {
-      const count = Math.round(w * d * 4);
+      const count = Math.round(w * d * 8);
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
       const topY = py + h / 2;
+      this.fireTopY = topY;
 
       for (let i = 0; i < count; i++) {
         const bx = px + (Math.random() - 0.5) * w;
         const bz = pz + (Math.random() - 0.5) * d;
+        const startY = topY + Math.random() * this.fireRise;
         positions[i * 3] = bx;
-        positions[i * 3 + 1] = topY + Math.random() * 0.4;
+        positions[i * 3 + 1] = startY;
         positions[i * 3 + 2] = bz;
 
-        // Random warm color: orange to yellow
-        const t = Math.random();
-        colors[i * 3] = 1;                     // R
-        colors[i * 3 + 1] = 0.3 + t * 0.5;    // G: 0.3–0.8
-        colors[i * 3 + 2] = t * 0.15;          // B: 0–0.15
+        colors[i * 3] = 1;
+        colors[i * 3 + 1] = 0.95;
+        colors[i * 3 + 2] = 0.7;
 
         this.fireData.push({
-          y: topY + Math.random() * 0.4,
+          y: startY,
           phase: Math.random() * Math.PI * 2,
-          speed: 0.4 + Math.random() * 0.8,
+          speed: 0.9 + Math.random() * 1.2,
+          wobble: 0.08 + Math.random() * 0.18,
           baseX: bx,
           baseZ: bz,
+          lifeMax: this.fireRise,
         });
       }
 
@@ -262,13 +292,15 @@ export class PathSegment {
       geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
       const mat = new THREE.PointsMaterial({
-        size: 0.15,
+        size: 0.55,
+        map: getFireSpriteTexture(),
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.95,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         vertexColors: true,
         sizeAttenuation: true,
+        alphaTest: 0.01,
       });
 
       this.fireParticles = new THREE.Points(geo, mat);
@@ -276,32 +308,39 @@ export class PathSegment {
       this.extraSceneObjects.push(this.fireParticles);
     }
 
-    // Add frost sparkle particles for ice surfaces
+    // Add falling snow particles for ice surfaces
     if (this.surfaceType === SurfaceType.Ice) {
-      const count = Math.round(w * d * 2);
+      const count = Math.max(40, Math.round(w * d * 5));
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
       const topY = py + h / 2;
+      const fallTop = topY + 4.5;
+      const fallBottom = topY + 0.05;
+      this.snowTopY = fallTop;
+      this.snowBottomY = fallBottom;
 
       for (let i = 0; i < count; i++) {
         const bx = px + (Math.random() - 0.5) * w;
         const bz = pz + (Math.random() - 0.5) * d;
-        const by = topY + 0.05 + Math.random() * 0.15;
+        const by = fallBottom + Math.random() * (fallTop - fallBottom);
         positions[i * 3] = bx;
         positions[i * 3 + 1] = by;
         positions[i * 3 + 2] = bz;
 
-        // White-blue sparkle colors
-        const t = Math.random();
-        colors[i * 3] = 0.7 + t * 0.3;       // R: 0.7–1.0
-        colors[i * 3 + 1] = 0.85 + t * 0.15;  // G: 0.85–1.0
-        colors[i * 3 + 2] = 1;                 // B: always full
+        const tint = 0.92 + Math.random() * 0.08;
+        colors[i * 3] = tint;
+        colors[i * 3 + 1] = tint;
+        colors[i * 3 + 2] = 1;
 
         this.frostData.push({
-          phase: Math.random() * Math.PI * 2,
+          y: by,
+          speed: 0.45 + Math.random() * 0.5,
           baseX: bx,
-          baseY: by,
           baseZ: bz,
+          swayPhase: Math.random() * Math.PI * 2,
+          swaySpeed: 0.7 + Math.random() * 0.9,
+          swayAmp: 0.12 + Math.random() * 0.25,
+          size: 0.6 + Math.random() * 0.7,
         });
       }
 
@@ -310,13 +349,15 @@ export class PathSegment {
       frostGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
       const frostMat = new THREE.PointsMaterial({
-        size: 0.08,
+        size: 0.22,
+        map: getSnowflakeSpriteTexture(),
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.92,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
         vertexColors: true,
         sizeAttenuation: true,
+        alphaTest: 0.02,
       });
 
       this.frostParticles = new THREE.Points(frostGeo, frostMat);
@@ -426,29 +467,41 @@ export class PathSegment {
       if (this.fireParticles) {
         const posArr = this.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
         const colArr = this.fireParticles.geometry.attributes.color as THREE.BufferAttribute;
-        const topY = this.mesh.position.y + this.size[1] / 2;
+        const topY = this.fireTopY;
+        const rise = this.fireRise;
 
         for (let i = 0; i < this.fireData.length; i++) {
           const fd = this.fireData[i];
           fd.y += fd.speed * dt;
-          fd.phase += dt * 4;
+          fd.phase += dt * (3 + fd.speed);
 
-          // Wobble horizontally
-          const wx = fd.baseX + Math.sin(fd.phase) * 0.1;
-          const wz = fd.baseZ + Math.cos(fd.phase * 0.7) * 0.1;
+          const life = Math.max(0, Math.min(1, (fd.y - topY) / rise));
+          // Wobble more as particle rises
+          const wobbleScale = fd.wobble * (0.4 + life * 1.2);
+          const wx = fd.baseX + Math.sin(fd.phase) * wobbleScale;
+          const wz = fd.baseZ + Math.cos(fd.phase * 0.7) * wobbleScale;
 
           posArr.setXYZ(i, wx, fd.y, wz);
 
-          // Fade from bright to dim as particle rises
-          const life = (fd.y - topY) / 0.6;
-          const alpha = Math.max(0, 1 - life);
-          colArr.setY(i, (0.3 + life * 0.5) * alpha + 0.1);
-          colArr.setZ(i, life * 0.1 * alpha);
+          // Color: white-yellow at base → orange → red → dark
+          let r: number, g: number, b: number;
+          if (life < 0.25) {
+            const t = life / 0.25;
+            r = 1; g = 1 - t * 0.1; b = 0.75 - t * 0.55;
+          } else if (life < 0.6) {
+            const t = (life - 0.25) / 0.35;
+            r = 1; g = 0.9 - t * 0.55; b = 0.2 - t * 0.18;
+          } else {
+            const t = (life - 0.6) / 0.4;
+            r = 1 - t * 0.5; g = 0.35 - t * 0.3; b = 0.02;
+          }
+          colArr.setXYZ(i, r, g, b);
 
           // Reset particle when it rises too high
-          if (fd.y > topY + 0.6) {
-            fd.y = topY;
+          if (fd.y > topY + rise) {
+            fd.y = topY + Math.random() * 0.05;
             fd.phase = Math.random() * Math.PI * 2;
+            fd.speed = 0.9 + Math.random() * 1.2;
           }
         }
         posArr.needsUpdate = true;
@@ -461,23 +514,28 @@ export class PathSegment {
       const shimmer = 0.2 + Math.sin(this.animTime * 1.5) * 0.1;
       this.material.emissiveIntensity = shimmer;
 
-      // Animate frost sparkles — twinkle in and out
+      // Animate falling snow
       if (this.frostParticles) {
-        const frostMat = this.frostParticles.material as THREE.PointsMaterial;
         const posArr = this.frostParticles.geometry.attributes.position as THREE.BufferAttribute;
+        const top = this.snowTopY;
+        const bottom = this.snowBottomY;
+        const range = top - bottom;
 
         for (let i = 0; i < this.frostData.length; i++) {
           const fd = this.frostData[i];
-          fd.phase += dt * (1.5 + Math.sin(i) * 0.5);
+          fd.y -= fd.speed * dt;
+          fd.swayPhase += fd.swaySpeed * dt;
 
-          // Twinkle: particle bobs slightly and fades in/out
-          const twinkle = Math.sin(fd.phase);
-          posArr.setY(i, fd.baseY + twinkle * 0.03);
+          const sway = Math.sin(fd.swayPhase) * fd.swayAmp;
+          const swayZ = Math.cos(fd.swayPhase * 0.6) * fd.swayAmp * 0.6;
+          posArr.setXYZ(i, fd.baseX + sway, fd.y, fd.baseZ + swayZ);
+
+          if (fd.y < bottom) {
+            fd.y = top + Math.random() * range * 0.3;
+            fd.swayPhase = Math.random() * Math.PI * 2;
+          }
         }
         posArr.needsUpdate = true;
-
-        // Global opacity pulse for shimmer effect
-        frostMat.opacity = 0.5 + Math.sin(this.animTime * 2.5) * 0.4;
       }
     }
 
@@ -670,14 +728,8 @@ export class PathSegment {
       const vrx = visualOx * cos + px;
       const vrz = visualOx * sin + pz;
 
-      const geo = new THREE.BoxGeometry(wallT, wallH, d);
-      const mat = new THREE.MeshStandardMaterial({
-        color: CONFIG.colors.pathEdge,
-        roughness: 0.9,
-        metalness: 0.05,
-        transparent: true,
-        opacity: 0.35,
-      });
+      const geo = createRoundedBoxGeometry(wallT, wallH, d, Math.min(0.12, wallT * 0.45), 4);
+      const mat = createEnergyMaterial(CONFIG.colors.pathEdge, 0.36, 0.55);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(vrx, oy, vrz);
       if (rotation) mesh.rotation.y = rotation;
@@ -703,14 +755,21 @@ export class PathSegment {
   }
 
   private addBridgeRails(
-    scene: THREE.Scene,
+    _scene: THREE.Scene,
     _physics: Physics,
     w: number, h: number, d: number,
-    px: number, py: number, pz: number,
-    rotation: number,
+    _px: number, _py: number, _pz: number,
+    _rotation: number,
   ) {
     const railH = CONFIG.path.bridgeRailHeight;
     const railT = 0.08;
+    const railMat = createSciFiMaterial({
+      color: 0xd5b681,
+      emissive: 0x5c3a11,
+      emissiveIntensity: 0.45,
+      roughness: 0.45,
+      metalness: 0.45,
+    });
 
     const offsets: [number, number][] = [
       [w / 2, 0],
@@ -718,24 +777,55 @@ export class PathSegment {
     ];
 
     for (const [ox, oz] of offsets) {
-      const cos = Math.cos(rotation);
-      const sin = Math.sin(rotation);
-      const rx = ox * cos - oz * sin + px;
-      const rz = ox * sin + oz * cos + pz;
-      const ry = py + h / 2 + railH / 2;
+      const mesh = createRoundedBar(railT, railH, d, railMat, 0.04);
+      mesh.position.set(ox, h / 2 + railH / 2, oz);
+      this.mesh.add(mesh);
+    }
+  }
 
-      const geo = new THREE.BoxGeometry(railT, railH, d);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xccaa77,
-        roughness: 0.6,
-        metalness: 0.3,
-        emissive: 0x332200,
-        emissiveIntensity: 0.3,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(rx, ry, rz);
-      if (rotation) mesh.rotation.y = rotation;
-      scene.add(mesh);
+  private addPlatformAccents(
+    w: number,
+    h: number,
+    d: number,
+    color: number,
+    emissive: number,
+    isBridge: boolean,
+  ) {
+    if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
+      return;
+    }
+
+    const colorObj = new THREE.Color(color);
+    const panelColor = colorObj.clone().lerp(new THREE.Color(0xffffff), isBridge ? 0.1 : 0.16).getHex();
+    const panelInset = Math.min(0.42, w * 0.12, d * 0.12);
+    const panel = createRoundedPanel(
+      Math.max(0.2, w - panelInset),
+      Math.max(0.2, d - panelInset),
+      panelColor,
+      emissive,
+      this.surfaceType === SurfaceType.Lava ? 0.68 : 0.82,
+    );
+    panel.position.y = h / 2 + 0.018;
+    this.mesh.add(panel);
+
+    const accentColor = emissive || (isBridge ? 0xd8b778 : 0x76a9ff);
+    const stripMat = createEnergyMaterial(accentColor, this.surfaceType === SurfaceType.Normal ? 0.22 : 0.38, 0.55);
+    const stripOffset = 0.14;
+    const stripH = 0.026;
+    const stripT = 0.055;
+
+    if (w >= d) {
+      for (const sign of [-1, 1]) {
+        const strip = createRoundedBar(Math.max(0.4, w - 0.35), stripH, stripT, stripMat, 0.025);
+        strip.position.set(0, h / 2 + 0.052, sign * (d / 2 - stripOffset));
+        this.mesh.add(strip);
+      }
+    } else {
+      for (const sign of [-1, 1]) {
+        const strip = createRoundedBar(stripT, stripH, Math.max(0.4, d - 0.35), stripMat, 0.025);
+        strip.position.set(sign * (w / 2 - stripOffset), h / 2 + 0.052, 0);
+        this.mesh.add(strip);
+      }
     }
   }
 }

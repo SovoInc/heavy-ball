@@ -3,6 +3,14 @@ import * as CANNON from "cannon-es";
 import { CONFIG } from "../config";
 import { SurfaceType } from "./Path";
 import { Physics } from "../physics";
+import {
+  createCrackTexture,
+  createEnergyMaterial,
+  createRoundedBoxGeometry,
+  createSciFiMaterial,
+  getFireSpriteTexture,
+  getSnowflakeSpriteTexture,
+} from "./visuals";
 
 export interface CurvedPathSegmentDef {
   center: [number, number, number];
@@ -38,12 +46,16 @@ export class CurvedPathSegment {
   private animTime = 0;
   private material: THREE.MeshStandardMaterial;
   private fireParticles: THREE.Points | null = null;
-  private fireData: { y: number; phase: number; speed: number; baseX: number; baseZ: number }[] = [];
+  private fireData: { y: number; phase: number; speed: number; wobble: number; baseX: number; baseZ: number }[] = [];
+  private fireTopY = 0;
+  private fireRise = 1.4;
   private frostParticles: THREE.Points | null = null;
-  private frostData: { phase: number; baseX: number; baseY: number; baseZ: number }[] = [];
+  private frostData: { y: number; speed: number; baseX: number; baseZ: number; swayPhase: number; swaySpeed: number; swayAmp: number }[] = [];
+  private snowTopY = 0;
+  private snowBottomY = 0;
   private arrowMeshes: THREE.Mesh[] = [];
   private arrowMaterials: THREE.MeshBasicMaterial[] = [];
-  private extraSceneObjects: THREE.Object3D[] = [];
+  extraSceneObjects: THREE.Object3D[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -139,9 +151,13 @@ export class CurvedPathSegment {
     }
     shape.closePath();
 
+    const platformRadius = Math.min(0.22, def.trackWidth * 0.08, def.height * 0.45);
     const extrudeSettings: THREE.ExtrudeGeometryOptions = {
       depth: def.height,
-      bevelEnabled: false,
+      bevelEnabled: true,
+      bevelThickness: platformRadius * 0.45,
+      bevelSize: platformRadius * 0.45,
+      bevelSegments: 4,
     };
     const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
@@ -151,17 +167,20 @@ export class CurvedPathSegment {
     // Shift so bottom is at cy - height/2
     geo.translate(cx, cy - def.height / 2, cz);
 
-    this.material = new THREE.MeshStandardMaterial({
+    this.material = createSciFiMaterial({
       color,
-      roughness: this.surfaceType === SurfaceType.Ice ? 0.1 : 0.8,
-      metalness: this.surfaceType === SurfaceType.Ice ? 0.6 : 0.1,
+      roughness: this.surfaceType === SurfaceType.Ice ? 0.16 : this.surfaceType === SurfaceType.Lava ? 0.42 : 0.58,
+      metalness: this.surfaceType === SurfaceType.Ice ? 0.55 : this.surfaceType === SurfaceType.Lava ? 0.08 : 0.28,
       emissive,
       emissiveIntensity,
+      map: this.surfaceType === SurfaceType.Crumbling ? getCrackTexture() : undefined,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = true;
     scene.add(this.mesh);
+
+    this.addCurvedTrim(def, emissive || 0x76a9ff);
 
     // --- Physics: N box segments along the arc ---
     const boxCount = Math.max(4, Math.ceil(Math.abs(aa) / (Math.PI / 12)));
@@ -239,14 +258,8 @@ export class CurvedPathSegment {
         // Visual wall — thin box oriented along tangent (local Z)
         const vx = cx + Math.cos(angle) * visualR;
         const vz = cz + Math.sin(angle) * visualR;
-        const geo = new THREE.BoxGeometry(wallT, wallH, arcLen);
-        const mat = new THREE.MeshStandardMaterial({
-          color: CONFIG.colors.pathEdge,
-          roughness: 0.9,
-          metalness: 0.05,
-          transparent: true,
-          opacity: 0.35,
-        });
+        const geo = createRoundedBoxGeometry(wallT, wallH, arcLen, Math.min(0.12, wallT * 0.45), 4);
+        const mat = createEnergyMaterial(CONFIG.colors.pathEdge, 0.36, 0.55);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(vx, wy, vz);
         // Rotate so local X = radial (wall thickness), local Z = tangent (arc length)
@@ -274,29 +287,31 @@ export class CurvedPathSegment {
   private addFireParticles(def: CurvedPathSegmentDef) {
     const [cx, cy, cz] = def.center;
     const area = Math.abs(def.arcAngle) * def.radius * def.trackWidth;
-    const count = Math.round(area * 4);
+    const count = Math.round(area * 8);
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const topY = cy + def.height / 2;
+    this.fireTopY = topY;
 
     for (let i = 0; i < count; i++) {
       const angle = def.startAngle + Math.random() * def.arcAngle;
       const r = this.innerR + Math.random() * def.trackWidth;
       const bx = cx + Math.cos(angle) * r;
       const bz = cz + Math.sin(angle) * r;
+      const startY = topY + Math.random() * this.fireRise;
       positions[i * 3] = bx;
-      positions[i * 3 + 1] = topY + Math.random() * 0.4;
+      positions[i * 3 + 1] = startY;
       positions[i * 3 + 2] = bz;
 
-      const t = Math.random();
       colors[i * 3] = 1;
-      colors[i * 3 + 1] = 0.3 + t * 0.5;
-      colors[i * 3 + 2] = t * 0.15;
+      colors[i * 3 + 1] = 0.95;
+      colors[i * 3 + 2] = 0.7;
 
       this.fireData.push({
-        y: topY + Math.random() * 0.4,
+        y: startY,
         phase: Math.random() * Math.PI * 2,
-        speed: 0.4 + Math.random() * 0.8,
+        speed: 0.9 + Math.random() * 1.2,
+        wobble: 0.08 + Math.random() * 0.18,
         baseX: bx,
         baseZ: bz,
       });
@@ -307,13 +322,15 @@ export class CurvedPathSegment {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 0.15,
+      size: 0.55,
+      map: getFireSpriteTexture(),
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.95,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       vertexColors: true,
       sizeAttenuation: true,
+      alphaTest: 0.01,
     });
 
     this.fireParticles = new THREE.Points(geo, mat);
@@ -324,31 +341,38 @@ export class CurvedPathSegment {
   private addFrostParticles(def: CurvedPathSegmentDef) {
     const [cx, cy, cz] = def.center;
     const area = Math.abs(def.arcAngle) * def.radius * def.trackWidth;
-    const count = Math.round(area * 2);
+    const count = Math.max(40, Math.round(area * 5));
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const topY = cy + def.height / 2;
+    const fallTop = topY + 4.5;
+    const fallBottom = topY + 0.05;
+    this.snowTopY = fallTop;
+    this.snowBottomY = fallBottom;
 
     for (let i = 0; i < count; i++) {
       const angle = def.startAngle + Math.random() * def.arcAngle;
       const r = this.innerR + Math.random() * def.trackWidth;
       const bx = cx + Math.cos(angle) * r;
       const bz = cz + Math.sin(angle) * r;
-      const by = topY + 0.05 + Math.random() * 0.15;
+      const by = fallBottom + Math.random() * (fallTop - fallBottom);
       positions[i * 3] = bx;
       positions[i * 3 + 1] = by;
       positions[i * 3 + 2] = bz;
 
-      const t = Math.random();
-      colors[i * 3] = 0.7 + t * 0.3;
-      colors[i * 3 + 1] = 0.85 + t * 0.15;
+      const tint = 0.92 + Math.random() * 0.08;
+      colors[i * 3] = tint;
+      colors[i * 3 + 1] = tint;
       colors[i * 3 + 2] = 1;
 
       this.frostData.push({
-        phase: Math.random() * Math.PI * 2,
+        y: by,
+        speed: 0.45 + Math.random() * 0.5,
         baseX: bx,
-        baseY: by,
         baseZ: bz,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 0.7 + Math.random() * 0.9,
+        swayAmp: 0.12 + Math.random() * 0.25,
       });
     }
 
@@ -357,13 +381,15 @@ export class CurvedPathSegment {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 0.08,
+      size: 0.22,
+      map: getSnowflakeSpriteTexture(),
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.92,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       vertexColors: true,
       sizeAttenuation: true,
+      alphaTest: 0.02,
     });
 
     this.frostParticles = new THREE.Points(geo, mat);
@@ -381,11 +407,11 @@ export class CurvedPathSegment {
       const mx = cx + Math.cos(angle) * def.radius;
       const mz = cz + Math.sin(angle) * def.radius;
 
-      const arrowGeo = new THREE.PlaneGeometry(def.trackWidth * 0.6, def.trackWidth * 0.6);
+      const arrowGeo = createChevronGeometry(def.trackWidth * 0.55);
       const arrowMat = new THREE.MeshBasicMaterial({
-        color: 0x4466ff,
+        color: 0x7dccff,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.62,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
@@ -416,24 +442,37 @@ export class CurvedPathSegment {
       if (this.fireParticles) {
         const posArr = this.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
         const colArr = this.fireParticles.geometry.attributes.color as THREE.BufferAttribute;
-        const topY = this.center[1] + this.height / 2;
+        const topY = this.fireTopY;
+        const rise = this.fireRise;
 
         for (let i = 0; i < this.fireData.length; i++) {
           const fd = this.fireData[i];
           fd.y += fd.speed * dt;
-          fd.phase += dt * 4;
-          const wx = fd.baseX + Math.sin(fd.phase) * 0.1;
-          const wz = fd.baseZ + Math.cos(fd.phase * 0.7) * 0.1;
+          fd.phase += dt * (3 + fd.speed);
+
+          const life = Math.max(0, Math.min(1, (fd.y - topY) / rise));
+          const wobbleScale = fd.wobble * (0.4 + life * 1.2);
+          const wx = fd.baseX + Math.sin(fd.phase) * wobbleScale;
+          const wz = fd.baseZ + Math.cos(fd.phase * 0.7) * wobbleScale;
           posArr.setXYZ(i, wx, fd.y, wz);
 
-          const life = (fd.y - topY) / 0.6;
-          const alpha = Math.max(0, 1 - life);
-          colArr.setY(i, (0.3 + life * 0.5) * alpha + 0.1);
-          colArr.setZ(i, life * 0.1 * alpha);
+          let r: number, g: number, b: number;
+          if (life < 0.25) {
+            const t = life / 0.25;
+            r = 1; g = 1 - t * 0.1; b = 0.75 - t * 0.55;
+          } else if (life < 0.6) {
+            const t = (life - 0.25) / 0.35;
+            r = 1; g = 0.9 - t * 0.55; b = 0.2 - t * 0.18;
+          } else {
+            const t = (life - 0.6) / 0.4;
+            r = 1 - t * 0.5; g = 0.35 - t * 0.3; b = 0.02;
+          }
+          colArr.setXYZ(i, r, g, b);
 
-          if (fd.y > topY + 0.6) {
-            fd.y = topY;
+          if (fd.y > topY + rise) {
+            fd.y = topY + Math.random() * 0.05;
             fd.phase = Math.random() * Math.PI * 2;
+            fd.speed = 0.9 + Math.random() * 1.2;
           }
         }
         posArr.needsUpdate = true;
@@ -447,15 +486,25 @@ export class CurvedPathSegment {
 
       if (this.frostParticles) {
         const posArr = this.frostParticles.geometry.attributes.position as THREE.BufferAttribute;
-        const frostMat = this.frostParticles.material as THREE.PointsMaterial;
+        const top = this.snowTopY;
+        const bottom = this.snowBottomY;
+        const range = top - bottom;
+
         for (let i = 0; i < this.frostData.length; i++) {
           const fd = this.frostData[i];
-          fd.phase += dt * (1.5 + Math.sin(i) * 0.5);
-          const twinkle = Math.sin(fd.phase);
-          posArr.setY(i, fd.baseY + twinkle * 0.03);
+          fd.y -= fd.speed * dt;
+          fd.swayPhase += fd.swaySpeed * dt;
+
+          const sway = Math.sin(fd.swayPhase) * fd.swayAmp;
+          const swayZ = Math.cos(fd.swayPhase * 0.6) * fd.swayAmp * 0.6;
+          posArr.setXYZ(i, fd.baseX + sway, fd.y, fd.baseZ + swayZ);
+
+          if (fd.y < bottom) {
+            fd.y = top + Math.random() * range * 0.3;
+            fd.swayPhase = Math.random() * Math.PI * 2;
+          }
         }
         posArr.needsUpdate = true;
-        frostMat.opacity = 0.5 + Math.sin(this.animTime * 2.5) * 0.4;
       }
     }
 
@@ -562,6 +611,63 @@ export class CurvedPathSegment {
       return rel >= aa - 0.05; // small tolerance
     }
   }
+
+  private addCurvedTrim(def: CurvedPathSegmentDef, color: number) {
+    if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
+      return;
+    }
+
+    const [cx, cy, cz] = def.center;
+    const material = createEnergyMaterial(
+      color,
+      this.surfaceType === SurfaceType.Normal ? 0.22 : 0.38,
+      0.55,
+    );
+    const tubeSegments = Math.max(8, Math.ceil(Math.abs(def.arcAngle) / (Math.PI / 32)));
+    const topY = cy + def.height / 2 + 0.055;
+
+    for (const edgeR of [this.innerR + 0.12, this.outerR - 0.12]) {
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i <= tubeSegments; i++) {
+        const t = i / tubeSegments;
+        const angle = def.startAngle + def.arcAngle * t;
+        points.push(new THREE.Vector3(
+          cx + Math.cos(angle) * edgeR,
+          topY,
+          cz + Math.sin(angle) * edgeR,
+        ));
+      }
+
+      const curve = new THREE.CatmullRomCurve3(points);
+      const trim = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, tubeSegments, 0.025, 8, false),
+        material,
+      );
+      trim.castShadow = false;
+      this.scene.add(trim);
+      this.extraSceneObjects.push(trim);
+    }
+  }
+}
+
+let sharedCrackTexture: THREE.CanvasTexture | null = null;
+function getCrackTexture(): THREE.CanvasTexture {
+  if (!sharedCrackTexture) sharedCrackTexture = createCrackTexture();
+  return sharedCrackTexture;
+}
+
+function createChevronGeometry(size: number): THREE.ShapeGeometry {
+  const s = size;
+  const shape = new THREE.Shape();
+  shape.moveTo(0, -s * 0.46);
+  shape.lineTo(s * 0.38, -s * 0.08);
+  shape.lineTo(s * 0.16, -s * 0.08);
+  shape.lineTo(s * 0.16, s * 0.42);
+  shape.lineTo(-s * 0.16, s * 0.42);
+  shape.lineTo(-s * 0.16, -s * 0.08);
+  shape.lineTo(-s * 0.38, -s * 0.08);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
 }
 
 /**

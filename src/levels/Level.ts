@@ -185,6 +185,7 @@ export class Level {
     for (const cp of this.curvedPathSegments) {
       this.sceneObjects.push(cp.mesh);
       for (const w of cp.walls) this.sceneObjects.push(w.mesh);
+      for (const obj of cp.extraSceneObjects) this.sceneObjects.push(obj);
     }
     for (const b of this.bridges) this.sceneObjects.push(b.mesh);
     for (const l of this.latticeWalls) this.sceneObjects.push(l.group);

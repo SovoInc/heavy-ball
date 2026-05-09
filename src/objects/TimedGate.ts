@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { Physics } from "../physics";
+import { createEnergyMaterial, createRoundedBar, createRoundedBoxGeometry, createSciFiMaterial } from "./visuals";
 
 export interface TimedGateDef {
   position: [number, number, number];
@@ -10,7 +11,7 @@ export interface TimedGateDef {
 }
 
 export class TimedGate {
-  mesh: THREE.Mesh;
+  mesh: THREE.Group;
   body: CANNON.Body;
   private onTime: number;
   private offTime: number;
@@ -24,19 +25,36 @@ export class TimedGate {
     this.onTime = def.onTime;
     this.offTime = def.offTime;
 
-    const geo = new THREE.BoxGeometry(w, h, d);
-    this.material = new THREE.MeshStandardMaterial({
-      color: 0xcc4444,
-      roughness: 0.5,
-      metalness: 0.3,
-      transparent: true,
-      opacity: 0.9,
-      emissive: 0xcc4444,
-      emissiveIntensity: 0.2,
-    });
-    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh = new THREE.Group();
     this.mesh.position.set(px, py, pz);
-    this.mesh.castShadow = true;
+    this.material = createEnergyMaterial(0xff5a5a, 0.48, 0.75);
+    const barrier = new THREE.Mesh(
+      createRoundedBoxGeometry(w, h, d, Math.min(0.14, w * 0.1, h * 0.05, d * 0.1), 4),
+      this.material,
+    );
+    barrier.castShadow = true;
+    this.mesh.add(barrier);
+
+    const postMat = createSciFiMaterial({
+      color: 0x4a2528,
+      emissive: 0xff3838,
+      emissiveIntensity: 0.32,
+      roughness: 0.35,
+      metalness: 0.58,
+    });
+    if (w >= d) {
+      for (const sign of [-1, 1]) {
+        const post = createRoundedBar(0.16, h + 0.25, Math.max(0.2, d + 0.16), postMat, 0.06);
+        post.position.x = sign * w / 2;
+        this.mesh.add(post);
+      }
+    } else {
+      for (const sign of [-1, 1]) {
+        const post = createRoundedBar(Math.max(0.2, w + 0.16), h + 0.25, 0.16, postMat, 0.06);
+        post.position.z = sign * d / 2;
+        this.mesh.add(post);
+      }
+    }
     scene.add(this.mesh);
 
     this.body = new CANNON.Body({
@@ -70,6 +88,9 @@ export class TimedGate {
     // Flicker warning before toggle
     if (this.active && (this.onTime - phase) < 0.5) {
       this.material.opacity = 0.4 + Math.sin(this.timer * 20) * 0.3;
+    } else if (this.active) {
+      this.material.opacity = 0.48;
     }
+    this.material.emissiveIntensity = 0.55 + Math.sin(this.timer * 5) * 0.18;
   }
 }

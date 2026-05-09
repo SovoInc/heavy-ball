@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
+import { createRoundedBoxGeometry, createSciFiMaterial } from "./visuals";
 
 const { debrisCount, debrisLifetime, debrisSpeed, debrisGravity, debrisSize } =
   CONFIG.breakable;
@@ -18,7 +19,7 @@ export class Debris {
   private chunks: Chunk[] = [];
   private elapsed = 0;
   private material: THREE.MeshStandardMaterial;
-  private geometry: THREE.BoxGeometry;
+  private geometry: THREE.BufferGeometry;
 
   constructor(
     private scene: THREE.Scene,
@@ -27,10 +28,11 @@ export class Debris {
     obstacleSize: [number, number, number],
   ) {
     const s = debrisSize;
-    this.geometry = new THREE.BoxGeometry(s, s, s);
-    this.material = new THREE.MeshStandardMaterial({
+    this.geometry = createRoundedBoxGeometry(s, s, s, s * 0.2, 2);
+    this.material = createSciFiMaterial({
       color,
-      roughness: 0.8,
+      roughness: 0.55,
+      metalness: 0.25,
       transparent: true,
     });
 

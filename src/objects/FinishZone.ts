@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
 import type { Ball } from "./Ball";
+import { createEnergyMaterial, createRingMesh, createSciFiMaterial, getPortalSwirlTexture } from "./visuals";
 
 export interface FinishZoneDef {
   position: [number, number, number];
@@ -12,6 +13,11 @@ export class FinishZone {
   private box: THREE.Box3;
   private time = 0;
   private discMaterial: THREE.MeshStandardMaterial;
+  private swirlMesh: THREE.Mesh;
+  private swirlMat: THREE.MeshBasicMaterial;
+  private torusMat: THREE.MeshBasicMaterial;
+  private beamMat: THREE.MeshBasicMaterial;
+  private beamMesh: THREE.Mesh;
   private particles: THREE.Points;
   private particleData: { angle: number; speed: number; r: number }[] = [];
   private center: THREE.Vector3;
@@ -27,43 +33,74 @@ export class FinishZone {
     const group = new THREE.Group();
     group.position.set(px, py, pz);
 
-    // Solid white disc lying flat on the platform
-    const discGeo = new THREE.CircleGeometry(this.discRadius, 32);
-    this.discMaterial = new THREE.MeshStandardMaterial({
+    const baseY = -h / 2 + 0.3; // top of platform surface
+
+    // Solid bright disc on the ground
+    const discGeo = new THREE.CircleGeometry(this.discRadius, 48);
+    this.discMaterial = createSciFiMaterial({
       color: 0xffffff,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.6,
+      emissive: 0xb8ffe6,
+      emissiveIntensity: 1.2,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       side: THREE.DoubleSide,
+      roughness: 0.18,
+      metalness: 0.2,
     });
     const disc = new THREE.Mesh(discGeo, this.discMaterial);
     disc.rotation.x = -Math.PI / 2;
-    disc.position.y = -h / 2 + 0.3; // on top of platform surface (0.25 platform half-height + 0.05 offset)
+    disc.position.y = baseY;
     group.add(disc);
 
-    // Outer glow ring
-    const ringGeo = new THREE.RingGeometry(this.discRadius * 0.9, this.discRadius * 1.1, 32);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.8,
+    // Swirling vortex on top of the disc
+    this.swirlMat = new THREE.MeshBasicMaterial({
+      map: getPortalSwirlTexture(),
+      color: 0xb8ffe6,
       transparent: true,
-      opacity: 0.5,
-      side: THREE.DoubleSide,
+      opacity: 0.95,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = -h / 2 + 0.31;
-    group.add(ring);
+    const swirlGeo = new THREE.PlaneGeometry(this.discRadius * 1.95, this.discRadius * 1.95);
+    this.swirlMesh = new THREE.Mesh(swirlGeo, this.swirlMat);
+    this.swirlMesh.rotation.x = -Math.PI / 2;
+    this.swirlMesh.position.y = baseY + 0.02;
+    group.add(this.swirlMesh);
 
-    scene.add(group);
+    // 3D torus ring — visible from any angle (unlike a flat ring that disappears edge-on)
+    this.torusMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const torusGeo = new THREE.TorusGeometry(this.discRadius * 1.02, this.discRadius * 0.06, 12, 64);
+    const torus = new THREE.Mesh(torusGeo, this.torusMat);
+    torus.rotation.x = Math.PI / 2;
+    torus.position.y = baseY + 0.05;
+    group.add(torus);
+
+    // Vertical light beam — visible from far away
+    this.beamMat = new THREE.MeshBasicMaterial({
+      color: 0xb8ffe6,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const beamHeight = 6;
+    const beamGeo = new THREE.CylinderGeometry(this.discRadius * 0.85, this.discRadius * 0.95, beamHeight, 32, 1, true);
+    this.beamMesh = new THREE.Mesh(beamGeo, this.beamMat);
+    this.beamMesh.position.y = baseY + beamHeight / 2;
+    group.add(this.beamMesh);
+
     this.mesh = group;
 
     // White swirling particles
-    this.particles = this.createParticles(px, py - h / 2 + 0.35, pz);
-    scene.add(this.particles);
+    this.particles = this.createParticles(-h / 2 + 0.35);
+    group.add(this.particles);
+    scene.add(group);
 
     this.box = new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(px, py, pz),
@@ -71,7 +108,7 @@ export class FinishZone {
     );
   }
 
-  private createParticles(cx: number, cy: number, cz: number): THREE.Points {
+  private createParticles(cy: number): THREE.Points {
     const count = 30;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
@@ -79,9 +116,9 @@ export class FinishZone {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * this.discRadius;
-      positions[i * 3] = cx + Math.cos(angle) * r;
+      positions[i * 3] = Math.cos(angle) * r;
       positions[i * 3 + 1] = cy + Math.random() * 0.6;
-      positions[i * 3 + 2] = cz + Math.sin(angle) * r;
+      positions[i * 3 + 2] = Math.sin(angle) * r;
 
       // White with slight warm tint
       const t = 0.85 + Math.random() * 0.15;
@@ -113,21 +150,23 @@ export class FinishZone {
 
   update(dt: number) {
     this.time += dt;
-    this.discMaterial.emissiveIntensity = 0.5 + Math.sin(this.time * 3) * 0.2;
+    this.discMaterial.emissiveIntensity = 1.0 + Math.sin(this.time * 3) * 0.4;
+    this.swirlMesh.rotation.z += dt * 1.4;
+    this.swirlMat.opacity = 0.85 + Math.sin(this.time * 3) * 0.12;
+    this.beamMat.opacity = 0.28 + Math.sin(this.time * 2.5) * 0.12;
+    this.torusMat.opacity = 0.85 + Math.sin(this.time * 3) * 0.15;
 
     // Spin particles
     const posArr = this.particles.geometry.attributes.position as THREE.BufferAttribute;
-    const cx = this.center.x;
-    const cy = this.center.y - (this.box.max.y - this.box.min.y) / 2 + 0.35;
-    const cz = this.center.z;
+    const cy = -(this.box.max.y - this.box.min.y) / 2 + 0.35;
 
     for (let i = 0; i < this.particleData.length; i++) {
       const pd = this.particleData[i];
       pd.angle += pd.speed * dt;
       posArr.setXYZ(i,
-        cx + Math.cos(pd.angle) * pd.r,
+        Math.cos(pd.angle) * pd.r,
         cy + 0.1 + Math.sin(pd.angle * 2) * 0.3,
-        cz + Math.sin(pd.angle) * pd.r,
+        Math.sin(pd.angle) * pd.r,
       );
     }
     posArr.needsUpdate = true;
@@ -142,20 +181,24 @@ export class FinishZone {
 }
 
 export class StartMarker {
-  mesh: THREE.Mesh;
+  mesh: THREE.Group;
 
   constructor(scene: THREE.Scene, position: [number, number, number]) {
     const [px, py, pz] = position;
-    const geo = new THREE.RingGeometry(0.8, 1.2, 32);
-    const mat = new THREE.MeshStandardMaterial({
-      color: CONFIG.colors.startZone,
-      emissive: CONFIG.colors.startZone,
-      emissiveIntensity: 0.4,
-      side: THREE.DoubleSide,
-    });
-    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh = new THREE.Group();
     this.mesh.position.set(px, py + 0.01, pz);
-    this.mesh.rotation.x = -Math.PI / 2;
+
+    const outer = createRingMesh(0.78, 1.18, createEnergyMaterial(CONFIG.colors.startZone, 0.44, 0.55), 56);
+    const inner = createRingMesh(0.22, 0.32, createEnergyMaterial(0x9bdcff, 0.5, 0.7), 40);
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.16, 32),
+      createEnergyMaterial(0x9bdcff, 0.34, 0.6),
+    );
+    disc.rotation.x = -Math.PI / 2;
+    outer.position.y = 0;
+    inner.position.y = 0.01;
+    disc.position.y = 0.012;
+    this.mesh.add(outer, inner, disc);
     scene.add(this.mesh);
   }
 }

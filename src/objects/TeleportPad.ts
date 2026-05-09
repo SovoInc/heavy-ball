@@ -1,10 +1,22 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
+import { createEnergyMaterial, createRingMesh, getPortalSwirlTexture } from "./visuals";
 
 export interface TeleportPairDef {
   a: [number, number, number]; // position of pad A (on a platform surface)
   b: [number, number, number]; // position of pad B (on a platform surface)
   radius?: number;             // trigger radius (default 1.5)
+}
+
+interface PortalSide {
+  group: THREE.Group;
+  pos: THREE.Vector3;
+  ringMat: THREE.MeshStandardMaterial;
+  swirlMat: THREE.MeshBasicMaterial;
+  swirlMesh: THREE.Mesh;
+  haloMat: THREE.MeshBasicMaterial;
+  particles: THREE.Points;
+  particleData: { angle: number; r: number; rTarget: number; speed: number; yOff: number; ySpeed: number }[];
 }
 
 export class TeleportPad {
@@ -17,91 +29,111 @@ export class TeleportPad {
   sceneObjects: THREE.Object3D[] = [];
 
   private animTime = 0;
-  private matA: THREE.MeshStandardMaterial;
-  private matB: THREE.MeshStandardMaterial;
-  private particlesA: THREE.Points;
-  private particlesB: THREE.Points;
-  private particleData: { angle: number; speed: number; r: number }[] = [];
+  private sideA: PortalSide;
+  private sideB: PortalSide;
 
   constructor(scene: THREE.Scene, def: TeleportPairDef) {
     this.posA = new THREE.Vector3(...def.a);
     this.posB = new THREE.Vector3(...def.b);
     this.radius = def.radius ?? 1.5;
 
-    const color = CONFIG.surfaces.teleport.color;
-    const emissive = CONFIG.surfaces.teleport.emissive;
+    this.sideA = this.buildSide(this.posA);
+    this.sideB = this.buildSide(this.posB);
 
-    this.matA = this.createMaterial(color, emissive);
-    this.matB = this.createMaterial(color, emissive);
-
-    this.meshA = this.createPadMesh(this.posA, this.matA);
-    this.meshB = this.createPadMesh(this.posB, this.matB);
-
-    this.particlesA = this.createParticles(this.posA);
-    this.particlesB = this.createParticles(this.posB);
+    this.meshA = this.sideA.group;
+    this.meshB = this.sideB.group;
 
     scene.add(this.meshA);
     scene.add(this.meshB);
-    scene.add(this.particlesA);
-    scene.add(this.particlesB);
-    this.sceneObjects.push(this.meshA, this.meshB, this.particlesA, this.particlesB);
+    scene.add(this.sideA.particles);
+    scene.add(this.sideB.particles);
+    this.sceneObjects.push(this.meshA, this.meshB, this.sideA.particles, this.sideB.particles);
   }
 
-  private createMaterial(color: number, emissive: number): THREE.MeshStandardMaterial {
-    return new THREE.MeshStandardMaterial({
-      color,
-      emissive,
-      emissiveIntensity: 0.6,
-      transparent: true,
-      opacity: 0.7,
-      roughness: 0.3,
-      metalness: 0.5,
-    });
-  }
-
-  private createPadMesh(pos: THREE.Vector3, mat: THREE.MeshStandardMaterial): THREE.Group {
+  private buildSide(pos: THREE.Vector3): PortalSide {
     const group = new THREE.Group();
+    const color = CONFIG.surfaces.teleport.color;
+    const emissive = CONFIG.surfaces.teleport.emissive;
 
-    // Outer ring
-    const ringGeo = new THREE.RingGeometry(this.radius * 0.6, this.radius, 32);
-    const ring = new THREE.Mesh(ringGeo, mat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(pos.x, pos.y + 0.05, pos.z);
+    // Outer ring — bright energy frame
+    const ringMat = createEnergyMaterial(color, 0.85, 1.4);
+    const ring = createRingMesh(this.radius * 0.78, this.radius, ringMat, 64);
+    ring.position.set(pos.x, pos.y + 0.06, pos.z);
     group.add(ring);
 
-    // Inner disc
-    const discGeo = new THREE.CircleGeometry(this.radius * 0.4, 24);
-    const discMat = mat.clone();
-    discMat.emissiveIntensity = 1.0;
+    // Outer rail glow
+    const rail = createRingMesh(this.radius * 1.05, this.radius * 1.18, createEnergyMaterial(0xcaa0ff, 0.45, 0.9), 64);
+    rail.position.set(pos.x, pos.y + 0.052, pos.z);
+    group.add(rail);
+
+    // Swirling vortex disc inside the ring
+    const swirlMat = new THREE.MeshBasicMaterial({
+      map: getPortalSwirlTexture(),
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const swirlGeo = new THREE.PlaneGeometry(this.radius * 1.6, this.radius * 1.6);
+    const swirlMesh = new THREE.Mesh(swirlGeo, swirlMat);
+    swirlMesh.rotation.x = -Math.PI / 2;
+    swirlMesh.position.set(pos.x, pos.y + 0.07, pos.z);
+    group.add(swirlMesh);
+
+    // Soft halo above the portal — gives a sense of depth
+    const haloMat = new THREE.MeshBasicMaterial({
+      map: getPortalSwirlTexture(),
+      color: 0xd5b8ff,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const haloGeo = new THREE.PlaneGeometry(this.radius * 2.4, this.radius * 2.4);
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.set(pos.x, pos.y + 0.09, pos.z);
+    group.add(halo);
+
+    // Inner bright disc — concentrated emissive core
+    const discGeo = new THREE.CircleGeometry(this.radius * 0.28, 32);
+    const discMat = createEnergyMaterial(color, 0.9, 2.0);
+    discMat.emissive = new THREE.Color(emissive);
     const disc = new THREE.Mesh(discGeo, discMat);
     disc.rotation.x = -Math.PI / 2;
-    disc.position.set(pos.x, pos.y + 0.06, pos.z);
+    disc.position.set(pos.x, pos.y + 0.08, pos.z);
     group.add(disc);
 
-    return group;
-  }
-
-  private createParticles(pos: THREE.Vector3): THREE.Points {
-    const count = 20;
+    // Particles spiraling inward and rising in a column
+    const count = 60;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
+    const data: PortalSide["particleData"] = [];
 
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * this.radius;
+      const rTarget = 0.1 + Math.random() * (this.radius * 0.95);
+      const r = rTarget;
+      const yOff = Math.random() * 2.2;
       positions[i * 3] = pos.x + Math.cos(angle) * r;
-      positions[i * 3 + 1] = pos.y + 0.1 + Math.random() * 0.5;
+      positions[i * 3 + 1] = pos.y + 0.1 + yOff;
       positions[i * 3 + 2] = pos.z + Math.sin(angle) * r;
 
       const t = Math.random();
-      colors[i * 3] = 0.5 + t * 0.3;
-      colors[i * 3 + 1] = 0.2 + t * 0.2;
-      colors[i * 3 + 2] = 0.8 + t * 0.2;
+      colors[i * 3] = 0.7 + t * 0.3;
+      colors[i * 3 + 1] = 0.55 + t * 0.35;
+      colors[i * 3 + 2] = 1;
 
-      this.particleData.push({
+      data.push({
         angle,
-        speed: 1 + Math.random() * 2,
         r,
+        rTarget,
+        speed: 1.6 + Math.random() * 2.4,
+        yOff,
+        ySpeed: 0.9 + Math.random() * 1.4,
       });
     }
 
@@ -109,36 +141,70 @@ export class TeleportPad {
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-    return new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.12,
+    const particleMat = new THREE.PointsMaterial({
+      size: 0.18,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       vertexColors: true,
       sizeAttenuation: true,
-    }));
+    });
+    const particles = new THREE.Points(geo, particleMat);
+
+    return {
+      group,
+      pos,
+      ringMat,
+      swirlMat,
+      swirlMesh,
+      haloMat,
+      particles,
+      particleData: data,
+    };
   }
 
   update(dt: number) {
     this.animTime += dt;
-    const pulse = 0.4 + Math.sin(this.animTime * 4) * 0.3;
-    this.matA.emissiveIntensity = pulse;
-    this.matB.emissiveIntensity = pulse;
+    const pulse = 0.8 + Math.sin(this.animTime * 4) * 0.4;
 
-    // Spin particles around each pad
-    for (const [particles, pos] of [[this.particlesA, this.posA], [this.particlesB, this.posB]] as const) {
-      const posArr = particles.geometry.attributes.position as THREE.BufferAttribute;
-      for (let i = 0; i < this.particleData.length; i++) {
-        const pd = this.particleData[i];
+    for (const side of [this.sideA, this.sideB]) {
+      side.ringMat.emissiveIntensity = pulse;
+      // Spin the swirl in opposite direction to the halo for parallax
+      side.swirlMesh.rotation.z += dt * 1.6;
+      side.swirlMat.opacity = 0.85 + Math.sin(this.animTime * 3) * 0.12;
+      side.haloMat.opacity = 0.28 + Math.sin(this.animTime * 2.2) * 0.12;
+
+      const posArr = side.particles.geometry.attributes.position as THREE.BufferAttribute;
+      const colArr = side.particles.geometry.attributes.color as THREE.BufferAttribute;
+      for (let i = 0; i < side.particleData.length; i++) {
+        const pd = side.particleData[i];
         pd.angle += pd.speed * dt;
-        posArr.setXYZ(i,
-          pos.x + Math.cos(pd.angle) * pd.r,
-          pos.y + 0.1 + Math.sin(pd.angle * 2) * 0.25,
-          pos.z + Math.sin(pd.angle) * pd.r,
-        );
+        pd.yOff += pd.ySpeed * dt;
+        // Spiral inward slowly, reset radius when too small
+        pd.r -= dt * 0.35;
+        if (pd.r < 0.08) {
+          pd.r = this.radius * (0.4 + Math.random() * 0.6);
+          pd.yOff = 0;
+          pd.angle = Math.random() * Math.PI * 2;
+        }
+        if (pd.yOff > 2.4) {
+          pd.yOff = 0;
+          pd.r = this.radius * (0.4 + Math.random() * 0.6);
+        }
+
+        const x = side.pos.x + Math.cos(pd.angle) * pd.r;
+        const z = side.pos.z + Math.sin(pd.angle) * pd.r;
+        const y = side.pos.y + 0.1 + pd.yOff;
+        posArr.setXYZ(i, x, y, z);
+
+        // Fade as particle rises and approaches the center
+        const heightFade = Math.max(0, 1 - pd.yOff / 2.4);
+        const intensity = heightFade;
+        colArr.setXYZ(i, 0.75 * intensity + 0.1, 0.55 * intensity + 0.1, 1 * intensity);
       }
       posArr.needsUpdate = true;
+      colArr.needsUpdate = true;
     }
   }
 
