@@ -127,8 +127,13 @@ export class CurvedPathSegment {
     const segments = 32;
     const innerR = this.innerR;
     const outerR = this.outerR;
-    const sa = def.startAngle;
-    const aa = def.arcAngle;
+    // Normal curves visually tuck under adjoining straight/curved pieces so
+    // the authored course reads as one continuous ribbon. Physics keeps the
+    // exact original bounds.
+    const mergePad = this.surfaceType === SurfaceType.Normal ? 0.012 : 0;
+    const arcSign = Math.sign(def.arcAngle) || 1;
+    const sa = def.startAngle - arcSign * mergePad;
+    const aa = def.arcAngle + arcSign * mergePad * 2;
 
     // Outer arc
     // Shape lives in XY; after rotateX(-PI/2) → (x, z, -y) in world.
@@ -154,7 +159,7 @@ export class CurvedPathSegment {
     const platformRadius = Math.min(0.22, def.trackWidth * 0.08, def.height * 0.45);
     const extrudeSettings: THREE.ExtrudeGeometryOptions = {
       depth: def.height,
-      bevelEnabled: true,
+      bevelEnabled: this.surfaceType !== SurfaceType.Normal,
       bevelThickness: platformRadius * 0.45,
       bevelSize: platformRadius * 0.45,
       bevelSegments: 4,
@@ -180,7 +185,12 @@ export class CurvedPathSegment {
     this.mesh.castShadow = true;
     scene.add(this.mesh);
 
-    this.addCurvedTrim(def, emissive || 0x76a9ff);
+    this.addCurvedTrim(
+      this.surfaceType === SurfaceType.Normal
+        ? { ...def, startAngle: sa, arcAngle: aa }
+        : def,
+      emissive || 0x76a9ff,
+    );
 
     // --- Physics: N box segments along the arc ---
     const boxCount = Math.max(4, Math.ceil(Math.abs(aa) / (Math.PI / 12)));

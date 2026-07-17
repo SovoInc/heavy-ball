@@ -201,8 +201,15 @@ export class PathSegment {
       this.invisibleOffTime = def.invisible.offTime;
     }
 
+    const mergesWithCourse =
+      this.surfaceType === SurfaceType.Normal && !this.movingDef && !isBridge;
     const platformRadius = Math.min(0.28, w * 0.08, d * 0.08, h * 0.45);
-    const geo = createRoundedBoxGeometry(w, h, d, platformRadius, 5);
+    // Static normal pieces are sections of one continuous course, not a row
+    // of rounded floating blocks. Square ends meet flush; gameplay pieces keep
+    // their rounded silhouette so their independence remains readable.
+    const geo = mergesWithCourse
+      ? new THREE.BoxGeometry(w, h, d)
+      : createRoundedBoxGeometry(w, h, d, platformRadius, 5);
     this.material = createSciFiMaterial({
       color,
       roughness: this.surfaceType === SurfaceType.Ice ? 0.16 : this.surfaceType === SurfaceType.Lava ? 0.42 : 0.58,
@@ -223,10 +230,11 @@ export class PathSegment {
       const depthPrepass = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false }));
       this.mesh.add(depthPrepass);
     }
-    // Tiny per-segment height stagger so abutting segments are never exactly
-    // coplanar — the pre-pass then resolves a single winner at overlaps
-    // instead of double-blending (the "dark band" artifact).
-    const yEpsilon = ((PathSegment.epsilonCounter++ % 16) + 1) * 0.0004;
+    // Translucent gameplay pieces need a tiny stagger at overlaps. Opaque
+    // normal course pieces stay on the exact authored plane so joins disappear.
+    const yEpsilon = transparent
+      ? ((PathSegment.epsilonCounter++ % 16) + 1) * 0.0004
+      : 0;
     this.mesh.position.set(px, py + yEpsilon, pz);
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = true;
@@ -827,13 +835,13 @@ export class PathSegment {
       // without covering the surface in a decorative grid.
       if (d >= w) {
         for (const sign of [-1, 1]) {
-          const rail = createRoundedBar(railWidth, railHeight, Math.max(0.2, d - 0.18), edgeMaterial, 0.02);
+          const rail = createRoundedBar(railWidth, railHeight, d + 0.08, edgeMaterial, 0.02);
           rail.position.set(sign * (w / 2 - railInset), h / 2 + 0.075, 0);
           this.mesh.add(rail);
         }
       } else {
         for (const sign of [-1, 1]) {
-          const rail = createRoundedBar(Math.max(0.2, w - 0.18), railHeight, railWidth, edgeMaterial, 0.02);
+          const rail = createRoundedBar(w + 0.08, railHeight, railWidth, edgeMaterial, 0.02);
           rail.position.set(0, h / 2 + 0.075, sign * (d / 2 - railInset));
           this.mesh.add(rail);
         }
