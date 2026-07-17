@@ -24,6 +24,12 @@ export enum SurfaceType {
   Invisible = "invisible",
 }
 
+// Platforms render translucent so the world reads through them.
+// Normal platforms are more see-through; special surfaces keep more body
+// so their gameplay color stays readable.
+export const PLATFORM_OPACITY = 0.82;
+export const NORMAL_PLATFORM_OPACITY = 0.72;
+
 export interface PathSegmentDef {
   position: [number, number, number];
   size: [number, number, number];
@@ -104,7 +110,9 @@ export class PathSegment {
   private physics: Physics;
   private scene: THREE.Scene;
   private animTime = 0;
+  private static epsilonCounter = 0;
   private material: THREE.MeshStandardMaterial;
+  private baseOpacity = PLATFORM_OPACITY;
   private originalPosition: THREE.Vector3;
   extraSceneObjects: THREE.Object3D[] = [];
 
@@ -138,29 +146,31 @@ export class PathSegment {
     let color: number;
     let emissive = 0x000000;
     let emissiveIntensity = 0;
-    let opacity = 1;
-    let transparent = false;
+    this.baseOpacity =
+      this.surfaceType === SurfaceType.Normal ? NORMAL_PLATFORM_OPACITY : PLATFORM_OPACITY;
+    const opacity = this.baseOpacity;
+    const transparent = true;
 
     switch (this.surfaceType) {
       case SurfaceType.Ice:
         color = CONFIG.surfaces.ice.color;
         emissive = CONFIG.surfaces.ice.emissive;
-        emissiveIntensity = 0.3;
+        emissiveIntensity = 0.5;
         break;
       case SurfaceType.Lava:
         color = CONFIG.surfaces.lava.color;
         emissive = CONFIG.surfaces.lava.emissive;
-        emissiveIntensity = 0.6;
+        emissiveIntensity = 1.6;
         break;
       case SurfaceType.Bounce:
         color = CONFIG.surfaces.bounce.color;
         emissive = CONFIG.surfaces.bounce.emissive;
-        emissiveIntensity = 0.4;
+        emissiveIntensity = 1.1;
         break;
       case SurfaceType.Speed:
         color = CONFIG.surfaces.speed.color;
         emissive = CONFIG.surfaces.speed.emissive;
-        emissiveIntensity = 0.5;
+        emissiveIntensity = 1.2;
         break;
       case SurfaceType.Crumbling:
         color = CONFIG.surfaces.crumbling.color;
@@ -170,12 +180,12 @@ export class PathSegment {
       case SurfaceType.Magnet:
         color = CONFIG.surfaces.magnet.color;
         emissive = CONFIG.surfaces.magnet.emissive;
-        emissiveIntensity = 0.8;
+        emissiveIntensity = 1.8;
         break;
       case SurfaceType.Invisible:
         color = CONFIG.surfaces.invisible.color;
         emissive = CONFIG.surfaces.invisible.emissive;
-        emissiveIntensity = 0.3;
+        emissiveIntensity = 0.6;
         break;
       default:
         color = isBridge ? CONFIG.colors.bridge : CONFIG.colors.path;
@@ -202,9 +212,20 @@ export class PathSegment {
       transparent,
       opacity,
       map: this.surfaceType === SurfaceType.Crumbling ? getCrackTexture() : undefined,
+      depthWrite: false,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
-    this.mesh.position.set(px, py, pz);
+    // Smooth blended translucency without seams: an invisible depth pre-pass
+    // copy writes depth in the opaque pass, so the translucent platform blends
+    // exactly once per pixel — interior box faces and crossing segments can't
+    // show through as bands.
+    const depthPrepass = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false }));
+    this.mesh.add(depthPrepass);
+    // Tiny per-segment height stagger so abutting segments are never exactly
+    // coplanar — the pre-pass then resolves a single winner at overlaps
+    // instead of double-blending (the "dark band" artifact).
+    const yEpsilon = ((PathSegment.epsilonCounter++ % 16) + 1) * 0.0004;
+    this.mesh.position.set(px, py + yEpsilon, pz);
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = true;
     if (def.rotation) {
@@ -460,7 +481,7 @@ export class PathSegment {
 
     if (this.surfaceType === SurfaceType.Lava) {
       // Pulsing glow
-      const pulse = 0.4 + Math.sin(this.animTime * 3) * 0.3;
+      const pulse = 1.2 + Math.sin(this.animTime * 3) * 0.7;
       this.material.emissiveIntensity = pulse;
 
       // Animate fire particles
@@ -511,7 +532,7 @@ export class PathSegment {
 
     if (this.surfaceType === SurfaceType.Ice) {
       // Subtle shimmer on the surface
-      const shimmer = 0.2 + Math.sin(this.animTime * 1.5) * 0.1;
+      const shimmer = 0.35 + Math.sin(this.animTime * 1.5) * 0.15;
       this.material.emissiveIntensity = shimmer;
 
       // Animate falling snow
@@ -541,7 +562,7 @@ export class PathSegment {
 
     if (this.surfaceType === SurfaceType.Bounce) {
       // Breathing glow
-      const breath = 0.3 + Math.sin(this.animTime * 2) * 0.2;
+      const breath = 0.8 + Math.sin(this.animTime * 2) * 0.4;
       this.material.emissiveIntensity = breath;
     }
 
@@ -552,7 +573,7 @@ export class PathSegment {
     }
 
     if (this.surfaceType === SurfaceType.Magnet) {
-      const pulse = 0.5 + Math.sin(this.animTime * 2) * 0.3;
+      const pulse = 1.3 + Math.sin(this.animTime * 2) * 0.6;
       this.material.emissiveIntensity = pulse;
 
       if (this.magnetParticles) {
@@ -580,8 +601,8 @@ export class PathSegment {
         this.invisibleActive = shouldBeActive;
         if (this.invisibleActive) {
           this.mesh.visible = true;
-          this.material.opacity = 1;
-          this.material.transparent = false;
+          this.material.opacity = this.baseOpacity;
+          this.material.transparent = true;
           this.physics.addBody(this.body);
           for (const w of this.walls) { w.mesh.visible = true; this.physics.addBody(w.body); }
         } else {
@@ -593,7 +614,7 @@ export class PathSegment {
       // Flicker warning 1.5s before disappearing
       if (this.invisibleActive && (this.invisibleOnTime - phase) < 1.5) {
         this.material.transparent = true;
-        this.material.opacity = 0.3 + Math.sin(this.animTime * 20) * 0.3;
+        this.material.opacity = this.baseOpacity * (0.55 + Math.sin(this.animTime * 20) * 0.55);
       }
     }
 
@@ -649,7 +670,7 @@ export class PathSegment {
 
       // Fade out as crumble progresses
       const remaining = this.crumbleTimer / CONFIG.surfaces.crumbling.delay;
-      this.material.opacity = Math.max(0, remaining);
+      this.material.opacity = Math.max(0, remaining) * this.baseOpacity;
       this.material.transparent = true;
 
       // Shake effect
@@ -691,8 +712,8 @@ export class PathSegment {
     this.crumbleTimer = -1;
     this.respawnTimer = -1;
     this.mesh.visible = true;
-    this.material.opacity = 1;
-    this.material.transparent = false;
+    this.material.opacity = this.baseOpacity;
+    this.material.transparent = true;
     this.mesh.position.copy(this.originalPosition);
 
     this.physics.addBody(this.body);
@@ -729,7 +750,7 @@ export class PathSegment {
       const vrz = visualOx * sin + pz;
 
       const geo = createRoundedBoxGeometry(wallT, wallH, d, Math.min(0.12, wallT * 0.45), 4);
-      const mat = createEnergyMaterial(CONFIG.colors.pathEdge, 0.36, 0.55);
+      const mat = createEnergyMaterial(CONFIG.colors.pathEdge, 0.36, 1.1);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(vrx, oy, vrz);
       if (rotation) mesh.rotation.y = rotation;
@@ -794,6 +815,12 @@ export class PathSegment {
     if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
       return;
     }
+    // Normal platforms (and bridges) skip accents entirely: the per-segment
+    // panel outline and end strips read as visible joints between abutting
+    // segments once the platforms are translucent.
+    if (this.surfaceType === SurfaceType.Normal) {
+      return;
+    }
 
     const colorObj = new THREE.Color(color);
     const panelColor = colorObj.clone().lerp(new THREE.Color(0xffffff), isBridge ? 0.1 : 0.16).getHex();
@@ -803,13 +830,13 @@ export class PathSegment {
       Math.max(0.2, d - panelInset),
       panelColor,
       emissive,
-      this.surfaceType === SurfaceType.Lava ? 0.68 : 0.82,
+      (this.surfaceType === SurfaceType.Lava ? 0.68 : 0.82) * PLATFORM_OPACITY,
     );
     panel.position.y = h / 2 + 0.018;
     this.mesh.add(panel);
 
     const accentColor = emissive || (isBridge ? 0xd8b778 : 0x76a9ff);
-    const stripMat = createEnergyMaterial(accentColor, this.surfaceType === SurfaceType.Normal ? 0.22 : 0.38, 0.55);
+    const stripMat = createEnergyMaterial(accentColor, 0.38, 0.55);
     const stripOffset = 0.14;
     const stripH = 0.026;
     const stripT = 0.055;

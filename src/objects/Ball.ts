@@ -16,10 +16,14 @@ export class Ball {
 
     const geo = new THREE.SphereGeometry(radius, 64, 64);
     const texture = Ball.createLogoTexture();
-    const mat = new THREE.MeshStandardMaterial({
+    // Clearcoat lacquer over the metallic base — with the scene environment
+    // map this reads as a polished billiard ball instead of flat gray.
+    const mat = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
       metalness: 0.48,
       roughness: 0.3,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
       map: texture,
       emissive: 0x111a24,
       emissiveIntensity: 0.16,

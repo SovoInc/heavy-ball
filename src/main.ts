@@ -57,6 +57,16 @@ class Game {
     this.setupHUDCallbacks();
     this.setupLevelSelectKey();
 
+    // Local visual-development shortcut: /?level=37 boots directly into Level 37
+    // as a guest. Vite replaces DEV at build time, so production always follows
+    // the normal wallet/demo flow even if the query parameter is present.
+    const devLevelIndex = this.getDevLevelIndex();
+    if (devLevelIndex !== null) {
+      this.player = { id: 0, alias: "Guest" };
+      this.startLevel(devLevelIndex);
+      return;
+    }
+
     // Check for existing player — wallet required
     this.player = getPlayer();
     if (this.player && this.player.wallet_address) {
@@ -71,6 +81,18 @@ class Game {
       this.player = null;
       this.hud.showWalletLogin();
     }
+  }
+
+  private getDevLevelIndex(): number | null {
+    if (!import.meta.env.DEV) return null;
+
+    const requestedLevel = Number.parseInt(
+      new URLSearchParams(window.location.search).get("level") ?? "",
+      10,
+    );
+    if (!Number.isInteger(requestedLevel)) return null;
+
+    return Math.min(Math.max(requestedLevel, 1), this.levelManager.levelCount) - 1;
   }
 
   private getPlayerIdentifier(): string | undefined {
@@ -214,6 +236,7 @@ class Game {
   }
 
   private onLevelStart() {
+    this.renderer.selectRandomBackground();
     this.state = "playing";
     this.fallCount = 0;
     this.speedBoosts = 0;

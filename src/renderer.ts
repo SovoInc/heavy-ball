@@ -1,14 +1,28 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import {
+  BloomEffect,
+  EffectComposer,
+  EffectPass,
+  RenderPass,
+  ToneMappingEffect,
+  ToneMappingMode,
+  VignetteEffect,
+} from "postprocessing";
 import { CONFIG } from "./config";
+import { BackgroundManager } from "./backgrounds/BackgroundManager";
+import { findBackgroundTheme } from "./backgrounds/BackgroundCatalog";
 
 export class Renderer {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
+  private composer: EffectComposer;
   private stars!: THREE.Points;
   private shootingStars: ShootingStar[] = [];
   private shootingStarGroup!: THREE.Group;
   private clock = new THREE.Clock();
+  private backgroundManager: BackgroundManager;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
@@ -21,19 +35,46 @@ export class Renderer {
     );
     this.camera.position.set(0, 10, 15);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, logarithmicDepthBuffer: true });
+    // Native AA off: the composer's MSAA buffers handle it (and smooth the
+    // platforms' alpha-hash dither).
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
     const dpr = Math.min(window.devicePixelRatio, 2);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.LinearToneMapping;
+    // Scene renders linear HDR into the composer's half-float buffer; the
+    // ACES tone-mapping effect at the end of the pipeline maps it to screen.
+    this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+
+    // Image-based ambient so metals/clearcoat have something to reflect.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.35;
+    pmrem.dispose();
+
+    this.composer = new EffectComposer(this.renderer, {
+      frameBufferType: THREE.HalfFloatType,
+      multisampling: 4,
+    });
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new BloomEffect({
+      luminanceThreshold: 0.85,
+      luminanceSmoothing: 0.2,
+      intensity: 0.9,
+      mipmapBlur: true,
+      radius: 0.7,
+    });
+    const vignette = new VignetteEffect({ offset: 0.28, darkness: 0.55 });
+    const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
+    this.composer.addPass(new EffectPass(this.camera, bloom, vignette, toneMapping));
 
     this.setupLighting();
     this.setupSky();
     this.setupStars();
     this.setupShootingStars();
+    this.backgroundManager = new BackgroundManager(this.scene);
 
     window.addEventListener("resize", this.onResize);
   }
@@ -41,10 +82,12 @@ export class Renderer {
   sun!: THREE.DirectionalLight;
 
   private setupLighting() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // Low flat fill — the environment map carries most of the ambient now,
+    // so form/shading from the sun and rim light stays readable.
+    const ambient = new THREE.AmbientLight(0xffffff, 0.22);
     this.scene.add(ambient);
 
-    const hemi = new THREE.HemisphereLight(0x8899cc, 0x443322, 0.6);
+    const hemi = new THREE.HemisphereLight(0x8899cc, 0x443322, 0.4);
     this.scene.add(hemi);
 
     this.sun = new THREE.DirectionalLight(0xffeedd, 1.4);
@@ -58,13 +101,34 @@ export class Renderer {
     this.sun.shadow.camera.near = 1;
     this.sun.shadow.camera.far = 100;
     this.sun.shadow.bias = -0.001;
+    this.sun.shadow.radius = 4;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
+
+    // Cool rim/back light opposite the sun: bright edge on the ball against
+    // the dark space background. No shadows — it's purely a highlight.
+    this.rim = new THREE.DirectionalLight(0x6688ff, 0.7);
+    this.rim.position.set(-20, 18, -20);
+    this.scene.add(this.rim);
+    this.scene.add(this.rim.target);
   }
+
+  private rim!: THREE.DirectionalLight;
 
   updateSunTarget(x: number, y: number, z: number) {
     this.sun.position.set(x + 20, y + 40, z + 20);
     this.sun.target.position.set(x, y, z);
+    this.rim.position.set(x - 20, y + 18, z - 20);
+    this.rim.target.position.set(x, y, z);
+  }
+
+  selectRandomBackground() {
+    const forcedTheme = findBackgroundTheme(new URLSearchParams(window.location.search).get("background"));
+    const theme = forcedTheme ?? this.backgroundManager.selectRandom();
+    if (forcedTheme) this.backgroundManager.setTheme(forcedTheme);
+    const showProceduralSky = theme.kind === "procedural";
+    this.stars.visible = showProceduralSky;
+    this.shootingStarGroup.visible = showProceduralSky;
   }
 
   private setupSky() {
@@ -119,12 +183,17 @@ export class Renderer {
       size: 1.2,
       sizeAttenuation: true,
       vertexColors: true,
-      transparent: true,
-      opacity: 0.9,
       fog: false,
+      // Background layer: drawn first, no depth — opaque objects (ball,
+      // obstacles) still paint over the stars, while translucent platforms
+      // blend over them, so stars show through platforms only.
+      transparent: false,
+      depthTest: false,
+      depthWrite: false,
     });
 
     this.stars = new THREE.Points(geo, mat);
+    this.stars.renderOrder = -1;
     this.scene.add(this.stars);
   }
 
@@ -138,7 +207,7 @@ export class Renderer {
     this.shootingStars.push(trail);
   }
 
-  updateEffects() {
+  updateEffects(): number {
     const dt = this.clock.getDelta();
 
     // Blink stars
@@ -169,21 +238,27 @@ export class Renderer {
         this.shootingStars.splice(i, 1);
       }
     }
+
+    return dt;
   }
 
   private onResize = () => {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+    this.composer.setSize(window.innerWidth, window.innerHeight, false);
   };
 
   render() {
-    this.updateEffects();
-    this.renderer.render(this.scene, this.camera);
+    const dt = this.updateEffects();
+    this.backgroundManager.update(this.camera, dt);
+    this.composer.render(dt);
   }
 
   dispose() {
     window.removeEventListener("resize", this.onResize);
+    this.backgroundManager.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
   }
 }
