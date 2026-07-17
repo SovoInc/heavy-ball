@@ -65,6 +65,7 @@ export class TrackBuilder {
     this.paths.push({
       position: [r(cx), r(this.y), r(cz)],
       size: [r(size[0]), r(size[1]), r(size[2])],
+      travelAxis: isXAligned ? "x" : "z",
       noWalls: true,
       ...opts,
     });

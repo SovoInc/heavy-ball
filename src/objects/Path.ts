@@ -2,14 +2,19 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { CONFIG } from "../config";
 import { Physics } from "../physics";
+import { FlameField } from "../effects/FlameField";
 import {
   createCrackTexture,
+  createFireMaterial,
+  COURSE_RAIL,
   createEnergyMaterial,
   createRoundedBar,
   createRoundedBoxGeometry,
   createRoundedPanel,
   createSciFiMaterial,
   getFireSpriteTexture,
+  getIceSurfaceTexture,
+  getLavaFlowTexture,
   getSnowflakeSpriteTexture,
 } from "./visuals";
 
@@ -41,6 +46,8 @@ export interface PathSegmentDef {
   tilt?: number; // pitch angle in radians
   platformMoving?: { axis: [number, number, number]; range: number; speed: number; pause?: number };
   invisible?: { onTime: number; offTime: number };
+  /** Authored direction of travel, used to keep edge rails parallel to motion. */
+  travelAxis?: "x" | "z";
 }
 
 function createArrowTexture(): THREE.CanvasTexture {
@@ -112,6 +119,8 @@ export class PathSegment {
   private animTime = 0;
   private static epsilonCounter = 0;
   private material: THREE.MeshStandardMaterial;
+  private surfaceTexture: THREE.Texture | null = null;
+  private travelAxis: "x" | "z";
   private baseOpacity = PLATFORM_OPACITY;
   private originalPosition: THREE.Vector3;
   extraSceneObjects: THREE.Object3D[] = [];
@@ -119,9 +128,10 @@ export class PathSegment {
   private arrowMesh: THREE.Mesh | null = null;
   private arrowMaterial: THREE.MeshBasicMaterial | null = null;
   private fireParticles: THREE.Points | null = null;
-  private fireData: { y: number; phase: number; speed: number; wobble: number; baseX: number; baseZ: number; lifeMax: number }[] = [];
+  private flameField: FlameField | null = null;
+  private fireData: { y: number; phase: number; speed: number; wobble: number; baseX: number; baseZ: number; lifeMax: number; size: number }[] = [];
   private fireTopY = 0;
-  private fireRise = 1.4;
+  private fireRise = 0.9;
   private frostParticles: THREE.Points | null = null;
   private frostData: { y: number; speed: number; baseX: number; baseZ: number; swayPhase: number; swaySpeed: number; swayAmp: number; size: number }[] = [];
   private snowTopY = 0;
@@ -140,6 +150,7 @@ export class PathSegment {
     const [px, py, pz] = def.position;
     const isBridge = def.isBridge ?? false;
     this.surfaceType = def.surfaceType ?? SurfaceType.Normal;
+    this.travelAxis = def.travelAxis ?? (d >= w ? "z" : "x");
     this.size = [w, h, d];
 
     // Determine color and material properties based on surface type
@@ -201,8 +212,7 @@ export class PathSegment {
       this.invisibleOffTime = def.invisible.offTime;
     }
 
-    const mergesWithCourse =
-      this.surfaceType === SurfaceType.Normal && !this.movingDef && !isBridge;
+    const mergesWithCourse = !this.movingDef && !isBridge;
     const platformRadius = Math.min(0.28, w * 0.08, d * 0.08, h * 0.45);
     // Static normal pieces are sections of one continuous course, not a row
     // of rounded floating blocks. Square ends meet flush; gameplay pieces keep
@@ -218,7 +228,7 @@ export class PathSegment {
       emissiveIntensity,
       transparent,
       opacity,
-      map: this.surfaceType === SurfaceType.Crumbling ? getCrackTexture() : undefined,
+      map: this.getSurfaceTexture(),
       depthWrite: this.surfaceType === SurfaceType.Normal,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
@@ -232,7 +242,7 @@ export class PathSegment {
     }
     // Translucent gameplay pieces need a tiny stagger at overlaps. Opaque
     // normal course pieces stay on the exact authored plane so joins disappear.
-    const yEpsilon = transparent
+    const yEpsilon = this.movingDef
       ? ((PathSegment.epsilonCounter++ % 16) + 1) * 0.0004
       : 0;
     this.mesh.position.set(px, py + yEpsilon, pz);
@@ -289,16 +299,17 @@ export class PathSegment {
 
     // Add fire particles for lava surfaces
     if (this.surfaceType === SurfaceType.Lava) {
-      const count = Math.round(w * d * 8);
+      const count = Math.max(18, Math.round(w * d * 2.0));
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
+      const sizes = new Float32Array(count);
       const topY = py + h / 2;
       this.fireTopY = topY;
 
       for (let i = 0; i < count; i++) {
         const bx = px + (Math.random() - 0.5) * w;
         const bz = pz + (Math.random() - 0.5) * d;
-        const startY = topY + Math.random() * this.fireRise;
+        const startY = topY + Math.pow(Math.random(), 1.8) * this.fireRise;
         positions[i * 3] = bx;
         positions[i * 3 + 1] = startY;
         positions[i * 3 + 2] = bz;
@@ -307,6 +318,8 @@ export class PathSegment {
         colors[i * 3 + 1] = 0.95;
         colors[i * 3 + 2] = 0.7;
 
+        const size = 0.5 + Math.random() * 0.3;
+        sizes[i] = size;
         this.fireData.push({
           y: startY,
           phase: Math.random() * Math.PI * 2,
@@ -315,28 +328,29 @@ export class PathSegment {
           baseX: bx,
           baseZ: bz,
           lifeMax: this.fireRise,
+          size,
         });
       }
 
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
       geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geo.setAttribute("flameSize", new THREE.BufferAttribute(sizes, 1));
 
-      const mat = new THREE.PointsMaterial({
-        size: 0.55,
-        map: getFireSpriteTexture(),
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        vertexColors: true,
-        sizeAttenuation: true,
-        alphaTest: 0.01,
-      });
+      const mat = createFireMaterial();
 
       this.fireParticles = new THREE.Points(geo, mat);
       scene.add(this.fireParticles);
       this.extraSceneObjects.push(this.fireParticles);
+
+      const tongueCount = Math.max(14, Math.round(w * d * 1.35));
+      const tonguePositions = Array.from({ length: tongueCount }, () => ({
+        x: px + (Math.random() - 0.5) * w * 0.94,
+        z: pz + (Math.random() - 0.5) * d * 0.94,
+      }));
+      this.flameField = new FlameField(tonguePositions, topY + 0.01);
+      scene.add(this.flameField.mesh);
+      this.extraSceneObjects.push(this.flameField.mesh);
     }
 
     // Add falling snow particles for ice surfaces
@@ -493,11 +507,14 @@ export class PathSegment {
       // Pulsing glow
       const pulse = 1.2 + Math.sin(this.animTime * 3) * 0.7;
       this.material.emissiveIntensity = pulse;
+      if (this.surfaceTexture) this.surfaceTexture.offset.y -= dt * 0.08;
+      this.flameField?.update(dt);
 
       // Animate fire particles
       if (this.fireParticles) {
         const posArr = this.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
         const colArr = this.fireParticles.geometry.attributes.color as THREE.BufferAttribute;
+        const sizeArr = this.fireParticles.geometry.attributes.flameSize as THREE.BufferAttribute;
         const topY = this.fireTopY;
         const rise = this.fireRise;
 
@@ -527,6 +544,7 @@ export class PathSegment {
             r = 1 - t * 0.5; g = 0.35 - t * 0.3; b = 0.02;
           }
           colArr.setXYZ(i, r, g, b);
+          sizeArr.setX(i, fd.size * (1 - life * 0.62));
 
           // Reset particle when it rises too high
           if (fd.y > topY + rise) {
@@ -537,6 +555,7 @@ export class PathSegment {
         }
         posArr.needsUpdate = true;
         colArr.needsUpdate = true;
+        sizeArr.needsUpdate = true;
       }
     }
 
@@ -822,30 +841,38 @@ export class PathSegment {
     emissive: number,
     isBridge: boolean,
   ) {
-    if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
-      return;
-    }
-    if (this.surfaceType === SurfaceType.Normal) {
-      const edgeMaterial = createEnergyMaterial(CONFIG.colors.pathEdge, 0.86, 2.2);
-      const railInset = Math.min(0.24, Math.min(w, d) * 0.1);
+    if ([SurfaceType.Normal, SurfaceType.Lava, SurfaceType.Ice].includes(this.surfaceType)) {
+      const edgeColor = this.surfaceType === SurfaceType.Lava
+        ? 0xff4b18
+        : this.surfaceType === SurfaceType.Ice
+          ? 0x9eefff
+          : CONFIG.colors.pathEdge;
+      const edgeMaterial = createEnergyMaterial(
+        edgeColor,
+        COURSE_RAIL.opacity,
+        COURSE_RAIL.emissiveIntensity,
+      );
+      const railInset = Math.min(COURSE_RAIL.inset, Math.min(w, d) * 0.1);
       const railHeight = 0.055;
-      const railWidth = 0.075;
+      const railWidth = COURSE_RAIL.width;
 
       // Rails follow the long axis, giving the course a continuous racing line
       // without covering the surface in a decorative grid.
-      if (d >= w) {
+      if (this.travelAxis === "z") {
         for (const sign of [-1, 1]) {
           const rail = createRoundedBar(railWidth, railHeight, d + 0.08, edgeMaterial, 0.02);
-          rail.position.set(sign * (w / 2 - railInset), h / 2 + 0.075, 0);
+          rail.position.set(sign * (w / 2 - railInset), h / 2 + COURSE_RAIL.elevation, 0);
           this.mesh.add(rail);
         }
       } else {
         for (const sign of [-1, 1]) {
           const rail = createRoundedBar(w + 0.08, railHeight, railWidth, edgeMaterial, 0.02);
-          rail.position.set(0, h / 2 + 0.075, sign * (d / 2 - railInset));
+          rail.position.set(0, h / 2 + COURSE_RAIL.elevation, sign * (d / 2 - railInset));
           this.mesh.add(rail);
         }
       }
+
+      if (this.surfaceType !== SurfaceType.Normal) return;
 
       // Sparse center ticks make speed legible without turning the track into
       // a texture sheet. Long segments get more reference marks.
@@ -854,12 +881,16 @@ export class PathSegment {
       const tickMaterial = createEnergyMaterial(0x9ee8ff, 0.3, 0.55);
       for (let i = 0; i < tickCount; i++) {
         const along = ((i + 1) / (tickCount + 1) - 0.5) * longAxis;
-        const tick = d >= w
+        const tick = this.travelAxis === "z"
           ? createRoundedBar(Math.min(0.52, w * 0.22), 0.018, 0.055, tickMaterial, 0.018)
           : createRoundedBar(0.055, 0.018, Math.min(0.52, d * 0.22), tickMaterial, 0.018);
-        tick.position.set(d >= w ? 0 : along, h / 2 + 0.052, d >= w ? along : 0);
+        tick.position.set(this.travelAxis === "z" ? 0 : along, h / 2 + 0.052, this.travelAxis === "z" ? along : 0);
         this.mesh.add(tick);
       }
+      return;
+    }
+
+    if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
       return;
     }
 
@@ -895,5 +926,19 @@ export class PathSegment {
         this.mesh.add(strip);
       }
     }
+  }
+
+  private getSurfaceTexture(): THREE.Texture | undefined {
+    const source = this.surfaceType === SurfaceType.Lava
+      ? getLavaFlowTexture()
+      : this.surfaceType === SurfaceType.Ice
+        ? getIceSurfaceTexture()
+        : this.surfaceType === SurfaceType.Crumbling
+          ? getCrackTexture()
+          : null;
+    if (!source) return undefined;
+    this.surfaceTexture = source.clone();
+    this.surfaceTexture.needsUpdate = true;
+    return this.surfaceTexture;
   }
 }
