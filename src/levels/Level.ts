@@ -417,6 +417,11 @@ export class Level {
     }
   }
 
+  updateFinish(dt: number, progress: number) {
+    this.finishZone.setAbduction(progress);
+    this.finishZone.update(dt);
+  }
+
   restoreBoxes() {
     for (const o of this.obstacles) {
       if (o.destroyed) {

@@ -8,7 +8,7 @@ import { LevelManager } from "./levels/LevelManager";
 import { HUD } from "./hud";
 import { CONFIG } from "./config";
 import { DebugRenderer } from "./debug";
-import { playFall, playLevelComplete, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
+import { playAbduction, playFall, playLevelComplete, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
 import { ElementalBuildup } from "./elemental/ElementalBuildup";
 import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
@@ -47,6 +47,7 @@ class Game {
   private previousSurface: SurfaceType | null = null;
   private runGeneration = 0;
   private currentBestMs: number | null = null;
+  private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -277,6 +278,10 @@ class Game {
       if (generation !== this.runGeneration || this.state !== "playing") return;
       this.hud.startTimer();
       this.controls.setEnabled(true);
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("finish")) {
+        const finish = this.levelManager.currentLevel?.finishZone.mesh.position;
+        if (finish) this.ball.setPosition(finish.x, finish.y, finish.z);
+      }
     }, 820);
 
     // Request a server session token for this level attempt
@@ -478,6 +483,7 @@ class Game {
 
       if (this.levelManager.isComplete(this.ball)) {
         playLevelComplete();
+        playAbduction();
         this.hud.showEventFlash("finish");
         this.momentumEffects.finish(this.ball);
         const timeMs = this.hud.stopTimer();
@@ -497,6 +503,7 @@ class Game {
 
         const lastLevel = this.levelManager.isLastLevel();
         this.state = "finishing";
+        this.ball.beginAbduction();
         window.setTimeout(() => {
           if (this.state !== "finishing") return;
           if (lastLevel) {
@@ -506,8 +513,14 @@ class Game {
             this.state = "levelComplete";
             this.hud.showLevelComplete(timeMs, false, levelNum, isPersonalBest);
           }
-        }, 420);
+        }, this.reducedMotion ? 600 : 1500);
       }
+    }
+
+    if (this.state === "finishing") {
+      const abductionProgress = this.ball.updateAbduction(dt);
+      this.levelManager.updateFinish(dt, abductionProgress);
+      this.speedIntensity = THREE.MathUtils.lerp(this.speedIntensity, 0, Math.min(1, dt * 5));
     }
 
     this.momentumEffects.update(this.ball, dt, this.speedIntensity);

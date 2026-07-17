@@ -54,6 +54,10 @@ export class LevelManager {
     this.currentLevel?.update(dt, shielded);
   }
 
+  updateFinish(dt: number, progress: number) {
+    this.currentLevel?.updateFinish(dt, progress);
+  }
+
   isComplete(ball: Ball): boolean {
     return this.currentLevel?.isComplete(ball) ?? false;
   }

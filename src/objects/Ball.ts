@@ -10,6 +10,10 @@ export class Ball {
   private currentScale = 1;
   private visualQuat = new THREE.Quaternion();
   private impactPulse = 0;
+  private abducting = false;
+  private abductionTime = 0;
+  private abductionOrigin = new CANNON.Vec3();
+  private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   constructor(scene: THREE.Scene, physics: Physics) {
     this.physics = physics;
@@ -45,6 +49,7 @@ export class Ball {
   }
 
   setPosition(x: number, y: number, z: number) {
+    this.abducting = false;
     this.body.position.set(x, y, z);
     this.body.velocity.setZero();
     this.body.angularVelocity.setZero();
@@ -101,6 +106,38 @@ export class Ball {
 
   pulseImpact(strength = 1) {
     this.impactPulse = Math.max(this.impactPulse, THREE.MathUtils.clamp(strength, 0.45, 1));
+  }
+
+  beginAbduction() {
+    this.abducting = true;
+    this.abductionTime = 0;
+    this.abductionOrigin.copy(this.body.position);
+    this.body.velocity.setZero();
+    this.body.angularVelocity.setZero();
+  }
+
+  updateAbduction(dt: number): number {
+    if (!this.abducting) return 0;
+    this.abductionTime += dt;
+    const duration = this.reducedMotion ? 0.55 : 1.45;
+    const t = THREE.MathUtils.clamp(this.abductionTime / duration, 0, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const lift = eased * (this.reducedMotion ? 1.1 : 3.4);
+    const wobble = this.reducedMotion ? 0 : Math.sin(t * Math.PI * 7) * 0.07 * (1 - t);
+
+    this.body.position.set(
+      this.abductionOrigin.x + Math.sin(t * Math.PI * 5) * wobble,
+      this.abductionOrigin.y + lift,
+      this.abductionOrigin.z + Math.cos(t * Math.PI * 4) * wobble,
+    );
+    this.visualQuat.premultiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dt * (2.2 + t * 5)),
+    );
+    this.mesh.position.copy(this.body.position as unknown as THREE.Vector3);
+    this.mesh.quaternion.copy(this.visualQuat);
+    const scale = this.currentScale * THREE.MathUtils.lerp(1, 0.88, eased);
+    this.mesh.scale.setScalar(scale);
+    return t;
   }
 
   /**

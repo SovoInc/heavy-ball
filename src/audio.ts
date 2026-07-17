@@ -284,6 +284,36 @@ export function playFreeze() {
   noise.stop(now + 0.3);
 }
 
+/** Rising magnetic beam — ball is pulled out of the finish portal. */
+export function playAbduction() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+
+  const hum = ac.createOscillator();
+  hum.type = "sine";
+  hum.frequency.setValueAtTime(90, now);
+  hum.frequency.exponentialRampToValueAtTime(420, now + 1.35);
+  const humGain = ac.createGain();
+  humGain.gain.setValueAtTime(0.001, now);
+  humGain.gain.linearRampToValueAtTime(0.13, now + 0.16);
+  humGain.gain.exponentialRampToValueAtTime(0.001, now + 1.45);
+  hum.connect(humGain).connect(ac.destination);
+  hum.start(now);
+  hum.stop(now + 1.5);
+
+  const shimmer = ac.createOscillator();
+  shimmer.type = "triangle";
+  shimmer.frequency.setValueAtTime(620, now + 0.25);
+  shimmer.frequency.exponentialRampToValueAtTime(1800, now + 1.3);
+  const shimmerGain = ac.createGain();
+  shimmerGain.gain.setValueAtTime(0.001, now);
+  shimmerGain.gain.linearRampToValueAtTime(0.045, now + 0.35);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+  shimmer.connect(shimmerGain).connect(ac.destination);
+  shimmer.start(now);
+  shimmer.stop(now + 1.45);
+}
+
 /** Soft filtered noise — continuous while ball moves */
 let rollNoise: AudioBufferSourceNode | null = null;
 let rollGain: GainNode | null = null;

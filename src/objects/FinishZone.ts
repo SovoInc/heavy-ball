@@ -22,6 +22,7 @@ export class FinishZone {
   private particleData: { angle: number; speed: number; r: number }[] = [];
   private center: THREE.Vector3;
   private discRadius: number;
+  private abduction = 0;
 
   constructor(scene: THREE.Scene, def: FinishZoneDef) {
     const [w, h, d] = def.size;
@@ -151,9 +152,10 @@ export class FinishZone {
   update(dt: number) {
     this.time += dt;
     this.discMaterial.emissiveIntensity = 1.0 + Math.sin(this.time * 3) * 0.4;
-    this.swirlMesh.rotation.z += dt * 1.4;
-    this.swirlMat.opacity = 0.85 + Math.sin(this.time * 3) * 0.12;
-    this.beamMat.opacity = 0.28 + Math.sin(this.time * 2.5) * 0.12;
+    this.swirlMesh.rotation.z += dt * (1.4 + this.abduction * 5);
+    this.swirlMat.opacity = Math.min(1, 0.85 + Math.sin(this.time * 3) * 0.12 + this.abduction * 0.18);
+    this.beamMat.opacity = Math.min(0.68, 0.24 + Math.sin(this.time * 2.5) * 0.1 + this.abduction * 0.3);
+    this.beamMesh.scale.setScalar(1 - this.abduction * 0.12);
     this.torusMat.opacity = 0.85 + Math.sin(this.time * 3) * 0.15;
 
     // Spin particles
@@ -162,7 +164,7 @@ export class FinishZone {
 
     for (let i = 0; i < this.particleData.length; i++) {
       const pd = this.particleData[i];
-      pd.angle += pd.speed * dt;
+      pd.angle += pd.speed * dt * (1 + this.abduction * 4);
       posArr.setXYZ(i,
         Math.cos(pd.angle) * pd.r,
         cy + 0.1 + Math.sin(pd.angle * 2) * 0.3,
@@ -170,6 +172,10 @@ export class FinishZone {
       );
     }
     posArr.needsUpdate = true;
+  }
+
+  setAbduction(progress: number) {
+    this.abduction = THREE.MathUtils.clamp(progress, 0, 1);
   }
 
   containsBall(ball: Ball): boolean {
