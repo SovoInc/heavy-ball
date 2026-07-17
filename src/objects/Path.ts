@@ -27,8 +27,8 @@ export enum SurfaceType {
 // Platforms render translucent so the world reads through them.
 // Normal platforms are more see-through; special surfaces keep more body
 // so their gameplay color stays readable.
-export const PLATFORM_OPACITY = 0.82;
-export const NORMAL_PLATFORM_OPACITY = 0.72;
+export const PLATFORM_OPACITY = 0.9;
+export const NORMAL_PLATFORM_OPACITY = 0.96;
 
 export interface PathSegmentDef {
   position: [number, number, number];
@@ -149,7 +149,7 @@ export class PathSegment {
     this.baseOpacity =
       this.surfaceType === SurfaceType.Normal ? NORMAL_PLATFORM_OPACITY : PLATFORM_OPACITY;
     const opacity = this.baseOpacity;
-    const transparent = true;
+    const transparent = this.surfaceType !== SurfaceType.Normal;
 
     switch (this.surfaceType) {
       case SurfaceType.Ice:
@@ -212,15 +212,17 @@ export class PathSegment {
       transparent,
       opacity,
       map: this.surfaceType === SurfaceType.Crumbling ? getCrackTexture() : undefined,
-      depthWrite: false,
+      depthWrite: this.surfaceType === SurfaceType.Normal,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
     // Smooth blended translucency without seams: an invisible depth pre-pass
     // copy writes depth in the opaque pass, so the translucent platform blends
     // exactly once per pixel — interior box faces and crossing segments can't
     // show through as bands.
-    const depthPrepass = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false }));
-    this.mesh.add(depthPrepass);
+    if (transparent) {
+      const depthPrepass = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false }));
+      this.mesh.add(depthPrepass);
+    }
     // Tiny per-segment height stagger so abutting segments are never exactly
     // coplanar — the pre-pass then resolves a single winner at overlaps
     // instead of double-blending (the "dark band" artifact).
@@ -331,7 +333,7 @@ export class PathSegment {
 
     // Add falling snow particles for ice surfaces
     if (this.surfaceType === SurfaceType.Ice) {
-      const count = Math.max(40, Math.round(w * d * 5));
+      const count = Math.max(16, Math.round(w * d * 1.2));
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
       const topY = py + h / 2;
@@ -370,10 +372,10 @@ export class PathSegment {
       frostGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
       const frostMat = new THREE.PointsMaterial({
-        size: 0.22,
+        size: 0.11,
         map: getSnowflakeSpriteTexture(),
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.5,
         depthWrite: false,
         blending: THREE.NormalBlending,
         vertexColors: true,
@@ -815,10 +817,41 @@ export class PathSegment {
     if (this.surfaceType === SurfaceType.Crumbling || this.surfaceType === SurfaceType.Invisible) {
       return;
     }
-    // Normal platforms (and bridges) skip accents entirely: the per-segment
-    // panel outline and end strips read as visible joints between abutting
-    // segments once the platforms are translucent.
     if (this.surfaceType === SurfaceType.Normal) {
+      const edgeMaterial = createEnergyMaterial(CONFIG.colors.pathEdge, 0.86, 2.2);
+      const railInset = Math.min(0.24, Math.min(w, d) * 0.1);
+      const railHeight = 0.055;
+      const railWidth = 0.075;
+
+      // Rails follow the long axis, giving the course a continuous racing line
+      // without covering the surface in a decorative grid.
+      if (d >= w) {
+        for (const sign of [-1, 1]) {
+          const rail = createRoundedBar(railWidth, railHeight, Math.max(0.2, d - 0.18), edgeMaterial, 0.02);
+          rail.position.set(sign * (w / 2 - railInset), h / 2 + 0.075, 0);
+          this.mesh.add(rail);
+        }
+      } else {
+        for (const sign of [-1, 1]) {
+          const rail = createRoundedBar(Math.max(0.2, w - 0.18), railHeight, railWidth, edgeMaterial, 0.02);
+          rail.position.set(0, h / 2 + 0.075, sign * (d / 2 - railInset));
+          this.mesh.add(rail);
+        }
+      }
+
+      // Sparse center ticks make speed legible without turning the track into
+      // a texture sheet. Long segments get more reference marks.
+      const longAxis = Math.max(w, d);
+      const tickCount = Math.max(1, Math.floor(longAxis / 5));
+      const tickMaterial = createEnergyMaterial(0x9ee8ff, 0.3, 0.55);
+      for (let i = 0; i < tickCount; i++) {
+        const along = ((i + 1) / (tickCount + 1) - 0.5) * longAxis;
+        const tick = d >= w
+          ? createRoundedBar(Math.min(0.52, w * 0.22), 0.018, 0.055, tickMaterial, 0.018)
+          : createRoundedBar(0.055, 0.018, Math.min(0.52, d * 0.22), tickMaterial, 0.018);
+        tick.position.set(d >= w ? 0 : along, h / 2 + 0.052, d >= w ? along : 0);
+        this.mesh.add(tick);
+      }
       return;
     }
 

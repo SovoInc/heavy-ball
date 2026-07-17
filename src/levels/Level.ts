@@ -49,6 +49,7 @@ export class Level {
   powerUpsCollected = 0;
   ballOnLava = false;
   ballOnIce = false;
+  ballSurfaceType: SurfaceType | null = null;
 
   onPowerUpCollected?: (type: PowerUpType) => void;
 
@@ -202,6 +203,7 @@ export class Level {
   update(dt: number, shielded = false) {
     this.ballOnLava = false;
     this.ballOnIce = false;
+    this.ballSurfaceType = null;
 
     for (const o of this.obstacles) {
       if (!o.destroyed) o.update(dt);
@@ -242,6 +244,7 @@ export class Level {
           ballPos.y <= topY + ballR + 0.5;
 
         if (!onTop) continue;
+        this.ballSurfaceType = seg.surfaceType;
 
         switch (seg.surfaceType) {
           case SurfaceType.Lava: {
@@ -312,6 +315,7 @@ export class Level {
           cseg.containsBall(ballPos.x, ballPos.z, ballR);
 
         if (!onTop) continue;
+        this.ballSurfaceType = cseg.surfaceType;
 
         switch (cseg.surfaceType) {
           case SurfaceType.Lava: {

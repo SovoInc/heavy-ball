@@ -33,13 +33,39 @@
         display: flex; justify-content: space-between; align-items: center;
         padding: 16px 24px;
       }
+      #hud-momentum {
+        --momentum: 0;
+        position: absolute; top: 50px; left: 50%;
+        width: 180px; transform: translateX(-50%);
+        text-align: center; font-family: 'Inter', sans-serif;
+        font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+        color: rgba(234,243,255,0.58); text-transform: uppercase;
+        pointer-events: none;
+      }
+      #hud-momentum::before {
+        content: ''; display: block; width: 100%; height: 2px; margin-bottom: 5px;
+        transform-origin: left center; transform: scaleX(var(--momentum));
+        background: linear-gradient(90deg, #62d9ff 0%, #eaf3ff 58%, #ff6a3d 100%);
+        box-shadow: 0 0 calc(5px + 12px * var(--momentum)) rgba(98,217,255,0.75);
+        transition: transform 80ms linear;
+      }
+      #hud-momentum.hot::before { box-shadow: 0 0 18px rgba(255,106,61,0.85); }
+      #hud-delta {
+        position: absolute; top: 79px; left: 50%; transform: translateX(-50%);
+        font: 700 9px/1 'Inter', sans-serif; letter-spacing: 1px; text-transform: uppercase;
+        color: #ff8c72; opacity: 0; transition: opacity .2s; pointer-events: none;
+      }
+      #hud-delta.visible { opacity: .8; }
+      #hud-delta.ahead { color: #b9ff5a; }
       #hud-level {
         font-family: 'Orbitron', monospace;
         font-size: 15px; font-weight: 700;
         letter-spacing: 1px; text-transform: uppercase;
         text-shadow: 0 0 12px rgba(100,180,255,0.4), 0 2px 8px rgba(0,0,0,0.6);
         color: #c0deff;
+        transition: opacity .35s, transform .35s, font-size .35s;
       }
+      #hud-level.compact { opacity: .58; transform: translateY(-3px); font-size: 11px; }
       #hud-timer {
         font-family: 'Orbitron', monospace;
         font-size: 24px; font-weight: 700;
@@ -48,9 +74,9 @@
         color: #e8f0ff;
       }
       #hud-restart {
-        background: rgba(255,60,60,0.15);
-        border: 1px solid rgba(255,80,80,0.3);
-        color: rgba(255,160,160,0.9); padding: 6px 18px;
+        background: rgba(5,7,19,0.42);
+        border: 1px solid rgba(234,243,255,0.14);
+        color: rgba(234,243,255,0.58); padding: 6px 12px;
         border-radius: 6px; cursor: pointer;
         font-family: 'Inter', sans-serif;
         font-size: 13px; font-weight: 600;
@@ -59,8 +85,9 @@
         transition: all 0.2s;
       }
       #hud-restart:hover {
-        background: rgba(255,60,60,0.3);
-        border-color: rgba(255,80,80,0.5);
+        background: rgba(255,106,61,0.16);
+        border-color: rgba(255,106,61,0.4);
+        color: #ffb09a;
       }
 
       /* ── Overlay (menu screens) ── */
@@ -94,26 +121,26 @@
       #overlay-content {
         display: flex; flex-direction: column;
         align-items: center;
-        padding: 52px 60px;
-        background: rgba(8, 8, 18, 0.82);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 24px;
-        backdrop-filter: blur(40px) saturate(1.2);
+        padding: 44px 48px 40px;
+        background: linear-gradient(135deg, rgba(5,7,19,0.9), rgba(12,18,32,0.78));
+        border: 1px solid rgba(98,217,255,0.18);
+        border-radius: 8px 28px 8px 28px;
+        backdrop-filter: blur(28px) saturate(1.15);
         box-shadow:
           0 32px 100px rgba(0,0,0,0.6),
           0 0 0 1px rgba(255,255,255,0.03),
           inset 0 1px 0 rgba(255,255,255,0.06);
-        max-width: 480px;
+        max-width: 440px;
         width: 90%;
       }
 
       /* Title */
       #overlay h1 {
         font-family: 'Orbitron', sans-serif;
-        font-size: 38px; font-weight: 900;
-        letter-spacing: 3px; text-transform: uppercase;
+        font-size: 42px; font-weight: 900;
+        letter-spacing: 5px; text-transform: uppercase;
         white-space: nowrap;
-        background: linear-gradient(135deg, #e8f0ff 0%, #8bb8ff 40%, #c8a0ff 70%, #ff9060 100%);
+        background: linear-gradient(100deg, #eaf3ff 0%, #62d9ff 58%, #ff6a3d 100%);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         background-clip: text;
         filter: drop-shadow(0 2px 12px rgba(100,140,255,0.3));
@@ -158,7 +185,7 @@
         position: relative;
         width: 100%; max-width: 280px;
         padding: 14px 32px;
-        border: none; border-radius: 10px;
+        border: none; border-radius: 4px 14px 4px 14px;
         font-family: 'Inter', sans-serif;
         font-size: 15px; font-weight: 700;
         letter-spacing: 0.5px; text-transform: uppercase;
@@ -167,13 +194,13 @@
         overflow: hidden;
       }
       .overlay-btn.primary {
-        background: linear-gradient(135deg, #6488ff 0%, #8b5cf6 100%);
-        color: #fff;
-        box-shadow: 0 4px 20px rgba(100,136,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+        background: linear-gradient(100deg, #46c9f4 0%, #62d9ff 62%, #eaf3ff 100%);
+        color: #07101b;
+        box-shadow: 0 4px 22px rgba(98,217,255,0.28), inset 0 1px 0 rgba(255,255,255,0.45);
       }
       .overlay-btn.primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 32px rgba(100,136,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow: 0 8px 34px rgba(98,217,255,0.48), inset 0 1px 0 rgba(255,255,255,0.45);
         filter: brightness(1.1);
       }
       .overlay-btn.primary:active {
@@ -213,6 +240,10 @@
       .overlay-btn:disabled {
         opacity: 0.5; cursor: not-allowed;
         transform: none !important;
+      }
+      .overlay-btn:focus-visible, #hud-restart:focus-visible {
+        outline: 2px solid #b9ff5a;
+        outline-offset: 3px;
       }
 
       /* Divider */
@@ -493,6 +524,24 @@
         pointer-events: none;
       }
 
+      #run-intro {
+        position: fixed; inset: 0; z-index: 8; pointer-events: none;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        opacity: 0; text-transform: uppercase;
+      }
+      #run-intro.show { animation: run-intro 1.15s ease-out both; }
+      #run-intro strong {
+        font-family: 'Orbitron', sans-serif; font-size: clamp(24px, 4vw, 54px);
+        letter-spacing: 0.1em; color: #eaf3ff;
+        text-shadow: 0 0 24px rgba(98,217,255,0.5), 0 3px 20px #050713;
+      }
+      .run-intro-index { color: #62d9ff; font: 700 10px/1 'Inter', sans-serif; letter-spacing: 0.3em; margin-bottom: 10px; }
+      .run-intro-command { color: #ff6a3d; font: 900 clamp(38px, 7vw, 86px)/1 'Orbitron', sans-serif; letter-spacing: 0.18em; margin-top: 18px; }
+      #event-flash { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; }
+      #event-flash.impact.show { animation: impact-flash .24s ease-out; box-shadow: inset 0 0 80px rgba(98,217,255,.45); }
+      #event-flash.fall.show { animation: fall-flash .5s ease-out; background: radial-gradient(circle, transparent 25%, rgba(255,55,40,.38)); }
+      #event-flash.finish.show { animation: finish-flash .55s ease-out; background: radial-gradient(circle, rgba(185,255,90,.32), transparent 66%); }
+
       /* ── Animations ── */
       @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(20px); }
@@ -501,6 +550,26 @@
       @keyframes shimmer {
         0% { background-position: -200% center; }
         100% { background-position: 200% center; }
+      }
+      @keyframes run-intro {
+        0% { opacity: 0; transform: scale(.96); }
+        14%, 62% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.035); }
+      }
+      @keyframes impact-flash { 0% { opacity: .8; } 100% { opacity: 0; } }
+      @keyframes fall-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+      @keyframes finish-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+      }
+      @media (max-width: 640px) {
+        #hud-top { padding: 12px 14px; }
+        #hud-level { font-size: 11px; max-width: 44vw; }
+        #hud-timer { font-size: 20px; }
+        #hud-restart { padding: 6px 10px; font-size: 10px; }
+        #hud-momentum { top: 43px; width: 120px; }
+        #overlay-content { width: calc(100% - 32px); padding: 34px 24px 30px; }
+        #overlay h1 { font-size: 31px; letter-spacing: 3px; }
       }
       #overlay-content {
         animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -522,6 +591,8 @@
         <div id="hud-timer">00:00.0</div>
         <button id="hud-restart">Give Up</button>
       </div>
+      <div id="hud-momentum"><span>0.0 m/s</span></div>
+      <div id="hud-delta"></div>
       <div id="hud-powerups"></div>
       <div id="hud-elemental">
         <div class="elemental-bar-container" id="fire-bar-container">
@@ -541,6 +612,8 @@
     </div>
     <div id="fire-overlay"></div>
     <div id="ice-overlay"></div>
+    <div id="event-flash"></div>
+    <div id="run-intro"></div>
     <div id="overlay">
       <div id="overlay-content">
         <h1>Heavy Ball</h1>

@@ -341,7 +341,7 @@ export class CurvedPathSegment {
   private addFrostParticles(def: CurvedPathSegmentDef) {
     const [cx, cy, cz] = def.center;
     const area = Math.abs(def.arcAngle) * def.radius * def.trackWidth;
-    const count = Math.max(40, Math.round(area * 5));
+    const count = Math.max(16, Math.round(area * 1.2));
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const topY = cy + def.height / 2;
@@ -381,10 +381,10 @@ export class CurvedPathSegment {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 0.22,
+      size: 0.11,
       map: getSnowflakeSpriteTexture(),
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.5,
       depthWrite: false,
       blending: THREE.NormalBlending,
       vertexColors: true,

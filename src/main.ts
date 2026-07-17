@@ -15,8 +15,10 @@ import { PowerUpType } from "./powerups/PowerUpType";
 import { api, setAuthToken, shortenWalletAddress } from "./api";
 import { getPlayer, setPlayer, clearPlayer, type PlayerState } from "./player";
 import { hasMidnightWallet, connectMidnightWallet, watchWalletSync, getMidnightWalletError } from "./midnight";
+import { MomentumEffects } from "./effects/MomentumEffects";
+import { SurfaceType } from "./objects/Path";
 
-type GameState = "menu" | "playing" | "levelComplete" | "allComplete";
+type GameState = "menu" | "playing" | "finishing" | "levelComplete" | "allComplete";
 
 class Game {
   private renderer: Renderer;
@@ -38,6 +40,13 @@ class Game {
   private currentBallScale = 1;
   private player: PlayerState | null = null;
   private elementalSoundTimer = 0;
+  private momentumEffects: MomentumEffects;
+  private speedIntensity = 0;
+  private previousSpeed = 0;
+  private impactCooldown = 0;
+  private previousSurface: SurfaceType | null = null;
+  private runGeneration = 0;
+  private currentBestMs: number | null = null;
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -51,6 +60,7 @@ class Game {
     this.debug = new DebugRenderer(this.renderer.scene, this.physics);
     this.powerUpManager = new PowerUpManager();
     this.elementalBuildup = new ElementalBuildup();
+    this.momentumEffects = new MomentumEffects(this.renderer.scene);
     this.controls.elementalBuildup = this.elementalBuildup;
 
     this.setupPowerUpCallbacks();
@@ -245,13 +255,29 @@ class Game {
     this.elementalBuildup.reset();
     this.ball.resetScale();
     this.currentBallScale = 1;
+    this.speedIntensity = 0;
+    this.previousSpeed = 0;
+    this.impactCooldown = 0;
+    this.previousSurface = null;
     this.controls.speedMultiplier = 1;
     this.hud.clearPowerUps();
     this.hud.updateElementalBuildup(0, 0);
     this.hud.setLevel(this.levelManager.currentLevelName, this.levelManager.currentLevelNumber - 1);
-    this.hud.startTimer();
+    const bestKey = `heavy-ball-best-${this.levelManager.currentLevelNumber}`;
+    const storedBest = Number.parseInt(localStorage.getItem(bestKey) ?? "", 10);
+    this.currentBestMs = Number.isFinite(storedBest) ? storedBest : null;
+    this.hud.setBestTime(this.currentBestMs);
     this.camera.snapTo(this.ball);
-    this.controls.setEnabled(true);
+    this.momentumEffects.reset(this.ball);
+    this.controls.setEnabled(false);
+
+    const generation = ++this.runGeneration;
+    this.hud.showRunIntro(this.levelManager.currentLevelNumber, this.levelManager.currentLevelName);
+    window.setTimeout(() => {
+      if (generation !== this.runGeneration || this.state !== "playing") return;
+      this.hud.startTimer();
+      this.controls.setEnabled(true);
+    }, 820);
 
     // Request a server session token for this level attempt
     if (this.player && this.player.id > 0) {
@@ -381,7 +407,44 @@ class Game {
       const level = this.levelManager.currentLevel;
       if (level && level.pendingShake > 0) {
         this.screenShake = level.pendingShake;
+        this.momentumEffects.burst(this.ball.mesh.position, 0xff6a3d, 1.2);
+        this.ball.pulseImpact(1);
+        this.hud.showEventFlash("impact");
         level.pendingShake = 0;
+      }
+
+      const normalizedSpeed = THREE.MathUtils.clamp(speed / Math.max(1, maxSpeed * 0.82), 0, 1);
+      this.speedIntensity = THREE.MathUtils.lerp(
+        this.speedIntensity,
+        normalizedSpeed,
+        Math.min(1, dt * (normalizedSpeed > this.speedIntensity ? 5.5 : 3.2)),
+      );
+      this.impactCooldown = Math.max(0, this.impactCooldown - dt);
+      if (this.previousSpeed - speed > 2.7 && this.previousSpeed > 4.5 && this.impactCooldown <= 0) {
+        this.momentumEffects.burst(this.ball.mesh.position, 0x62d9ff, Math.min(1.5, this.previousSpeed / 8));
+        this.ball.pulseImpact(Math.min(1, this.previousSpeed / 8));
+        this.hud.showEventFlash("impact");
+        this.screenShake = Math.max(this.screenShake, 0.13);
+        this.impactCooldown = 0.22;
+      }
+      this.previousSpeed = speed;
+      this.hud.updateMomentum(this.speedIntensity, speed);
+
+      if (level && level.ballSurfaceType !== this.previousSurface) {
+        const surfaceColors: Partial<Record<SurfaceType, number>> = {
+          [SurfaceType.Ice]: 0x9eeaff,
+          [SurfaceType.Lava]: 0xff4b22,
+          [SurfaceType.Bounce]: 0xb9ff5a,
+          [SurfaceType.Speed]: 0x62d9ff,
+          [SurfaceType.Magnet]: 0xc267ff,
+          [SurfaceType.Crumbling]: 0xffc46b,
+        };
+        const color = level.ballSurfaceType ? surfaceColors[level.ballSurfaceType] : undefined;
+        if (color !== undefined) {
+          this.momentumEffects.burst(this.ball.mesh.position, color, 0.85);
+          if (level.ballSurfaceType === SurfaceType.Bounce) this.ball.pulseImpact(1);
+        }
+        this.previousSurface = level.ballSurfaceType;
       }
 
       if (!this.powerUpManager.isTimeFrozen()) {
@@ -395,6 +458,8 @@ class Game {
         this.hud.updateElementalBuildup(0, 0);
         if (!this.powerUpManager.hasShield()) {
           playFall();
+          this.hud.showEventFlash("fall");
+          this.momentumEffects.fall();
           this.fallCount++;
           this.screenShake = 0.3;
           this.levelManager.currentLevel!.restoreBoxes();
@@ -402,6 +467,7 @@ class Game {
             ...this.levelManager.currentLevel!.startPosition,
           );
           this.camera.snapTo(this.ball);
+          this.momentumEffects.reset(this.ball);
         } else {
           this.ball.setPosition(
             ...this.levelManager.currentLevel!.startPosition,
@@ -412,6 +478,8 @@ class Game {
 
       if (this.levelManager.isComplete(this.ball)) {
         playLevelComplete();
+        this.hud.showEventFlash("finish");
+        this.momentumEffects.finish(this.ball);
         const timeMs = this.hud.stopTimer();
         this.controls.setEnabled(false);
         this.hud.clearPowerUps();
@@ -421,18 +489,29 @@ class Game {
         this.submitScore(timeMs);
 
         const levelNum = this.levelManager.currentLevelNumber;
-
-        if (this.levelManager.isLastLevel()) {
-          this.state = "allComplete";
-          this.hud.showAllComplete(timeMs);
-        } else {
-          this.state = "levelComplete";
-          this.hud.showLevelComplete(timeMs, false, levelNum);
+        const isPersonalBest = this.currentBestMs === null || timeMs < this.currentBestMs;
+        if (isPersonalBest) {
+          localStorage.setItem(`heavy-ball-best-${levelNum}`, String(Math.round(timeMs)));
+          this.currentBestMs = timeMs;
         }
+
+        const lastLevel = this.levelManager.isLastLevel();
+        this.state = "finishing";
+        window.setTimeout(() => {
+          if (this.state !== "finishing") return;
+          if (lastLevel) {
+            this.state = "allComplete";
+            this.hud.showAllComplete(timeMs);
+          } else {
+            this.state = "levelComplete";
+            this.hud.showLevelComplete(timeMs, false, levelNum, isPersonalBest);
+          }
+        }, 420);
       }
     }
 
-    this.camera.update(this.ball);
+    this.momentumEffects.update(this.ball, dt, this.speedIntensity);
+    this.camera.update(this.ball, this.speedIntensity, dt);
     this.renderer.updateSunTarget(
       this.ball.position.x,
       this.ball.position.y,
@@ -447,7 +526,7 @@ class Game {
     }
 
     this.debug.update(this.ball);
-    this.renderer.render();
+    this.renderer.render(this.speedIntensity);
   };
 }
 

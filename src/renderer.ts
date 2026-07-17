@@ -23,6 +23,7 @@ export class Renderer {
   private shootingStarGroup!: THREE.Group;
   private clock = new THREE.Clock();
   private backgroundManager: BackgroundManager;
+  private speedLines!: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
@@ -34,6 +35,7 @@ export class Renderer {
       500,
     );
     this.camera.position.set(0, 10, 15);
+    this.scene.add(this.camera);
 
     // Native AA off: the composer's MSAA buffers handle it (and smooth the
     // platforms' alpha-hash dither).
@@ -74,6 +76,7 @@ export class Renderer {
     this.setupSky();
     this.setupStars();
     this.setupShootingStars();
+    this.setupSpeedLines();
     this.backgroundManager = new BackgroundManager(this.scene);
 
     window.addEventListener("resize", this.onResize);
@@ -202,6 +205,46 @@ export class Renderer {
     this.scene.add(this.shootingStarGroup);
   }
 
+  private setupSpeedLines() {
+    const count = 34;
+    const positions = new Float32Array(count * 2 * 3);
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * 18;
+      const y = (Math.random() - 0.5) * 10;
+      const z = -3 - Math.random() * 20;
+      positions.set([x, y, z, x, y, z - 0.45 - Math.random() * 1.1], i * 6);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.LineBasicMaterial({
+      color: 0x9ee8ff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.speedLines = new THREE.LineSegments(geometry, material);
+    this.speedLines.frustumCulled = false;
+    this.speedLines.renderOrder = 9;
+    this.camera.add(this.speedLines);
+  }
+
+  private updateSpeedLines(dt: number, momentum: number) {
+    const visibility = THREE.MathUtils.clamp((momentum - 0.56) / 0.44, 0, 1);
+    this.speedLines.visible = visibility > 0.01;
+    this.speedLines.material.opacity = visibility * 0.44;
+    if (!this.speedLines.visible) return;
+    const position = this.speedLines.geometry.getAttribute("position") as THREE.BufferAttribute;
+    for (let i = 0; i < position.count; i += 2) {
+      let z = position.getZ(i) + dt * (12 + momentum * 28);
+      if (z > -1.5) z = -22 - Math.random() * 8;
+      const length = 0.5 + momentum * 1.8;
+      position.setZ(i, z);
+      position.setZ(i + 1, z - length);
+    }
+    position.needsUpdate = true;
+  }
+
   private spawnShootingStar() {
     const trail = new ShootingStar(this.shootingStarGroup);
     this.shootingStars.push(trail);
@@ -249,8 +292,9 @@ export class Renderer {
     this.composer.setSize(window.innerWidth, window.innerHeight, false);
   };
 
-  render() {
+  render(momentum = 0) {
     const dt = this.updateEffects();
+    this.updateSpeedLines(dt, momentum);
     this.backgroundManager.update(this.camera, dt);
     this.composer.render(dt);
   }

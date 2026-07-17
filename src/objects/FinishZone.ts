@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
 import type { Ball } from "./Ball";
-import { createEnergyMaterial, createRingMesh, createSciFiMaterial, getPortalSwirlTexture } from "./visuals";
+import { createEnergyMaterial, createRoundedBoxGeometry, createSciFiMaterial, getPortalSwirlTexture } from "./visuals";
 
 export interface FinishZoneDef {
   position: [number, number, number];
@@ -186,19 +186,21 @@ export class StartMarker {
   constructor(scene: THREE.Scene, position: [number, number, number]) {
     const [px, py, pz] = position;
     this.mesh = new THREE.Group();
-    this.mesh.position.set(px, py + 0.01, pz);
+    this.mesh.position.set(px, py - CONFIG.ball.radius + 0.025, pz);
 
-    const outer = createRingMesh(0.78, 1.18, createEnergyMaterial(CONFIG.colors.startZone, 0.44, 0.55), 56);
-    const inner = createRingMesh(0.22, 0.32, createEnergyMaterial(0x9bdcff, 0.5, 0.7), 40);
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(0.16, 32),
-      createEnergyMaterial(0x9bdcff, 0.34, 0.6),
-    );
-    disc.rotation.x = -Math.PI / 2;
-    outer.position.y = 0;
-    inner.position.y = 0.01;
-    disc.position.y = 0.012;
-    this.mesh.add(outer, inner, disc);
+    const cold = createEnergyMaterial(CONFIG.colors.pathEdge, 0.82, 1.8);
+    const hot = createEnergyMaterial(0xff6a3d, 0.72, 1.4);
+    // A flush launch stamp, not a hovering target: three widening bars point
+    // down-course and energize the first movement beat.
+    const widths = [0.42, 0.72, 1.02];
+    for (let i = 0; i < widths.length; i++) {
+      const bar = new THREE.Mesh(
+        createRoundedBoxGeometry(widths[i], 0.025, 0.09, 0.025, 3),
+        i === widths.length - 1 ? hot : cold,
+      );
+      bar.position.set(0, 0, (i - 1) * 0.24);
+      this.mesh.add(bar);
+    }
     scene.add(this.mesh);
   }
 }

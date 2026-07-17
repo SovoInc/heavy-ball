@@ -63,6 +63,11 @@ export class HUD {
   private achievementToastIcon: HTMLElement;
   private achievementToastName: HTMLElement;
   private achievementToastTimeout: ReturnType<typeof setTimeout> | null = null;
+  private momentumEl: HTMLElement;
+  private runIntroEl: HTMLElement;
+  private eventFlashEl: HTMLElement;
+  private deltaEl: HTMLElement;
+  private bestTimeMs: number | null = null;
 
   private elapsedMs = 0;
   private running = false;
@@ -103,6 +108,10 @@ export class HUD {
     this.achievementToast = document.getElementById("achievement-toast")!;
     this.achievementToastIcon = this.achievementToast.querySelector(".toast-icon")!;
     this.achievementToastName = this.achievementToast.querySelector(".toast-name")!;
+    this.momentumEl = document.getElementById("hud-momentum")!;
+    this.runIntroEl = document.getElementById("run-intro")!;
+    this.eventFlashEl = document.getElementById("event-flash")!;
+    this.deltaEl = document.getElementById("hud-delta")!;
 
     // Create level select popup
     this.levelSelectEl = document.createElement("div");
@@ -116,7 +125,7 @@ export class HUD {
     `;
     document.body.appendChild(this.levelSelectEl);
 
-    this.restartBtn.textContent = "Give Up";
+    this.restartBtn.textContent = "Exit run";
     this.restartBtn.addEventListener("click", () => this.onGiveUp?.());
     this.overlayBtns.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
@@ -173,6 +182,31 @@ export class HUD {
     this.currentLevelIndex = index;
   }
 
+  showRunIntro(levelNumber: number, name: string) {
+    this.levelEl.classList.remove("compact");
+    this.runIntroEl.innerHTML = `
+      <span class="run-intro-index">Course ${String(levelNumber).padStart(2, "0")}</span>
+      <strong>${this.escapeHtml(name)}</strong>
+      <span class="run-intro-command">Roll</span>
+    `;
+    this.runIntroEl.classList.remove("show");
+    void this.runIntroEl.offsetWidth;
+    this.runIntroEl.classList.add("show");
+    window.setTimeout(() => this.levelEl.classList.add("compact"), 1700);
+  }
+
+  updateMomentum(intensity: number, speed: number) {
+    this.momentumEl.style.setProperty("--momentum", intensity.toFixed(3));
+    this.momentumEl.classList.toggle("hot", intensity > 0.72);
+    this.momentumEl.querySelector("span")!.textContent = `${speed.toFixed(1)} m/s`;
+  }
+
+  showEventFlash(kind: "impact" | "fall" | "finish") {
+    this.eventFlashEl.className = kind;
+    void this.eventFlashEl.offsetWidth;
+    this.eventFlashEl.classList.add("show");
+  }
+
   startTimer() {
     this.elapsedMs = 0;
     this.running = true;
@@ -187,6 +221,18 @@ export class HUD {
     if (!this.running) return;
     this.elapsedMs += dt * 1000;
     this.timerEl.textContent = this.formatTime(this.elapsedMs);
+    if (this.bestTimeMs !== null) {
+      const delta = this.elapsedMs - this.bestTimeMs;
+      const sign = delta <= 0 ? "−" : "+";
+      this.deltaEl.textContent = `${sign}${Math.abs(delta / 1000).toFixed(1)} best`;
+      this.deltaEl.classList.toggle("ahead", delta <= 0);
+      this.deltaEl.classList.add("visible");
+    }
+  }
+
+  setBestTime(bestTimeMs: number | null) {
+    this.bestTimeMs = bestTimeMs;
+    this.deltaEl.classList.toggle("visible", bestTimeMs !== null);
   }
 
   adjustTimer(deltaMs: number) {
@@ -258,11 +304,11 @@ export class HUD {
   showWalletLogin() {
     this.resetOverlay();
     this.overlayH1.textContent = "Heavy Ball";
-    this.overlaySubtitle.textContent = "Connect your Midnight wallet to play";
+    this.overlaySubtitle.textContent = "One ball. No brakes. Hold the line.";
     this.overlayBtns.innerHTML = `
       <div class="network-badge" style="text-align:center;font-size:11px;color:rgba(200,210,230,0.5);letter-spacing:1px;margin-bottom:4px"></div>
-      <button class="overlay-btn primary" id="btn-wallet-connect">Connect Wallet</button>
-      <button class="overlay-btn secondary" id="btn-demo">Demo</button>
+      <button class="overlay-btn primary" id="btn-demo">Roll now</button>
+      <button class="overlay-btn wallet" id="btn-wallet-connect">Connect wallet for ranked runs</button>
     `;
     this.overlay.classList.remove("hidden");
   }
@@ -315,7 +361,7 @@ export class HUD {
 
     const subtitle = continueLevel > 0
       ? `Level ${continueLevel} completed`
-      : "Guide the ball to the finish";
+      : "Build momentum. Survive the course.";
 
     this.overlaySubtitle.innerHTML = subtitle;
 
@@ -346,7 +392,7 @@ export class HUD {
       `;
     } else {
       this.overlayBtns.innerHTML = `
-        <button class="overlay-btn primary" id="btn-start">Play</button>
+        <button class="overlay-btn primary" id="btn-start">Roll now</button>
         ${leaderboardBtn}
         ${achievementsBtn}
         ${logoutBtn}
@@ -355,10 +401,10 @@ export class HUD {
     this.overlay.classList.remove("hidden");
   }
 
-  showLevelComplete(timeMs: number, isLastLevel: boolean, levelNumber?: number) {
+  showLevelComplete(timeMs: number, isLastLevel: boolean, levelNumber?: number, personalBest = false) {
     this.resetOverlay();
     this.overlayH1.textContent = "Level Complete";
-    this.overlaySubtitle.textContent = "";
+    this.overlaySubtitle.textContent = personalBest ? "New personal best" : "Course cleared";
     this.overlayTime.style.display = "block";
     this.overlayTime.textContent = this.formatTime(timeMs);
 

@@ -9,6 +9,7 @@ export class Ball {
   private physics: Physics;
   private currentScale = 1;
   private visualQuat = new THREE.Quaternion();
+  private impactPulse = 0;
 
   constructor(scene: THREE.Scene, physics: Physics) {
     this.physics = physics;
@@ -67,6 +68,13 @@ export class Ball {
       this.visualQuat.premultiply(delta);
     }
     this.mesh.quaternion.copy(this.visualQuat);
+    this.impactPulse = Math.max(0, this.impactPulse - dt * 5.5);
+    const squash = Math.sin(this.impactPulse * Math.PI) * 0.13;
+    this.mesh.scale.set(
+      this.currentScale * (1 + squash),
+      this.currentScale * (1 - squash * 0.8),
+      this.currentScale * (1 + squash),
+    );
   }
 
   get position(): CANNON.Vec3 {
@@ -89,6 +97,10 @@ export class Ball {
 
   resetScale() {
     this.setScale(1);
+  }
+
+  pulseImpact(strength = 1) {
+    this.impactPulse = Math.max(this.impactPulse, THREE.MathUtils.clamp(strength, 0.45, 1));
   }
 
   /**

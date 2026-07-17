@@ -21,7 +21,7 @@ export const CONFIG = {
     bounceRestitution: 0.85,
   },
   camera: {
-    offset: { x: 0, y: 8, z: 12 },
+    offset: { x: 0, y: 7, z: 10 },
     lookAheadDistance: 3,
     lerpSpeed: 0.06,
   },
@@ -38,8 +38,8 @@ export const CONFIG = {
   },
   colors: {
     ball: 0x8899aa,
-    path: 0x556677,
-    pathEdge: 0x445566,
+    path: 0x172033,
+    pathEdge: 0x62d9ff,
     bridge: 0x997755,
     latticeWall: 0x99aabb,
     finishZone: 0x44cc88,
