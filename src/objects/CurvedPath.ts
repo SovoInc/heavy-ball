@@ -196,7 +196,9 @@ export class CurvedPathSegment {
         ? 0xff4b18
         : this.surfaceType === SurfaceType.Ice
           ? 0x9eefff
-          : emissive || 0x76a9ff,
+          : this.surfaceType === SurfaceType.Normal
+            ? CONFIG.colors.pathEdge
+            : emissive || CONFIG.colors.pathEdge,
     );
 
     // --- Physics: N box segments along the arc ---
