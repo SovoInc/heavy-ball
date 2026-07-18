@@ -36,6 +36,53 @@ export function playBounce(intensity: number) {
   noise.stop(now + 0.08);
 }
 
+/** Layered collision accent; surface changes the bright transient while weight stays low. */
+export function playImpactAccent(intensity: number, tone: "metal" | "ice" | "fire" = "metal") {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const strength = Math.min(1, intensity / 10);
+  if (strength < 0.28) return;
+
+  const sub = ac.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(72, now);
+  sub.frequency.exponentialRampToValueAtTime(34, now + 0.13);
+  const subGain = ac.createGain();
+  subGain.gain.setValueAtTime(0.12 * strength, now);
+  subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+  sub.connect(subGain).connect(ac.destination);
+  sub.start(now);
+  sub.stop(now + 0.15);
+
+  const transient = ac.createBufferSource();
+  transient.buffer = makeNoise(ac, 0.11);
+  const filter = ac.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = tone === "ice" ? 4300 : tone === "fire" ? 1500 : 2600;
+  filter.Q.value = tone === "ice" ? 4 : 2;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.1 * strength, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+  transient.connect(filter).connect(gain).connect(ac.destination);
+  transient.start(now);
+  transient.stop(now + 0.12);
+}
+
+export function playNearMiss(intensity: number) {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(1100 + intensity * 45, now);
+  osc.frequency.exponentialRampToValueAtTime(260, now + 0.16);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(Math.min(0.065, intensity * 0.006), now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.18);
+}
+
 /** Glass-like shatter — obstacle breaks */
 export function playShatter() {
   const ac = getCtx();

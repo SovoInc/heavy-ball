@@ -8,7 +8,7 @@ import { LevelManager } from "./levels/LevelManager";
 import { HUD } from "./hud";
 import { CONFIG } from "./config";
 import { DebugRenderer } from "./debug";
-import { playAbduction, playFall, playLevelComplete, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
+import { playAbduction, playFall, playImpactAccent, playLevelComplete, playNearMiss, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
 import { ElementalBuildup } from "./elemental/ElementalBuildup";
 import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
@@ -16,6 +16,7 @@ import { api, setAuthToken, shortenWalletAddress } from "./api";
 import { getPlayer, setPlayer, clearPlayer, type PlayerState } from "./player";
 import { hasMidnightWallet, connectMidnightWallet, watchWalletSync, getMidnightWalletError } from "./midnight";
 import { MomentumEffects } from "./effects/MomentumEffects";
+import { ContactEffects } from "./effects/ContactEffects";
 import { SurfaceType } from "./objects/Path";
 
 type GameState = "menu" | "playing" | "finishing" | "levelComplete" | "allComplete";
@@ -41,10 +42,12 @@ class Game {
   private player: PlayerState | null = null;
   private elementalSoundTimer = 0;
   private momentumEffects: MomentumEffects;
+  private contactEffects: ContactEffects;
   private speedIntensity = 0;
   private previousSpeed = 0;
   private impactCooldown = 0;
   private previousSurface: SurfaceType | null = null;
+  private nearMissCooldown = 0;
   private runGeneration = 0;
   private currentBestMs: number | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -62,6 +65,7 @@ class Game {
     this.powerUpManager = new PowerUpManager();
     this.elementalBuildup = new ElementalBuildup();
     this.momentumEffects = new MomentumEffects(this.renderer.scene);
+    this.contactEffects = new ContactEffects(this.renderer.scene);
     this.controls.elementalBuildup = this.elementalBuildup;
 
     this.setupPowerUpCallbacks();
@@ -258,6 +262,8 @@ class Game {
     this.currentBallScale = 1;
     this.speedIntensity = 0;
     this.previousSpeed = 0;
+    this.nearMissCooldown = 0;
+    this.contactEffects.reset();
     this.impactCooldown = 0;
     this.previousSurface = null;
     this.controls.speedMultiplier = 1;
@@ -425,15 +431,41 @@ class Game {
         Math.min(1, dt * (normalizedSpeed > this.speedIntensity ? 5.5 : 3.2)),
       );
       this.impactCooldown = Math.max(0, this.impactCooldown - dt);
+      this.nearMissCooldown = Math.max(0, this.nearMissCooldown - dt);
       if (this.previousSpeed - speed > 2.7 && this.previousSpeed > 4.5 && this.impactCooldown <= 0) {
+        const impactEnergy = this.previousSpeed - speed + this.previousSpeed * 0.45;
         this.momentumEffects.burst(this.ball.mesh.position, 0x62d9ff, Math.min(1.5, this.previousSpeed / 8));
+        this.contactEffects.impact(this.ball.mesh.position, level?.ballSurfaceType ?? null, impactEnergy);
+        level?.pulseNearbyRails(this.ball.mesh.position, impactEnergy / 8);
         this.ball.pulseImpact(Math.min(1, this.previousSpeed / 8));
         this.hud.showEventFlash("impact");
-        this.screenShake = Math.max(this.screenShake, 0.13);
+        const velocity = new THREE.Vector3(
+          this.ball.body.velocity.x,
+          this.ball.body.velocity.y,
+          this.ball.body.velocity.z,
+        );
+        this.camera.addImpactImpulse(velocity, impactEnergy * 0.012);
+        const impactTone = level?.ballSurfaceType === SurfaceType.Ice
+          ? "ice"
+          : level?.ballSurfaceType === SurfaceType.Lava ? "fire" : "metal";
+        playImpactAccent(impactEnergy, impactTone);
         this.impactCooldown = 0.22;
       }
       this.previousSpeed = speed;
       this.hud.updateMomentum(this.speedIntensity, speed);
+
+      if (level && speed > 6.2 && this.nearMissCooldown <= 0) {
+        const nearMiss = level.findNearMiss(this.ball.mesh.position, 1.2);
+        if (nearMiss) {
+          this.contactEffects.nearMiss(nearMiss);
+          this.camera.addImpactImpulse(
+            this.ball.mesh.position.clone().sub(nearMiss),
+            Math.min(0.07, speed * 0.006),
+          );
+          playNearMiss(speed);
+          this.nearMissCooldown = 0.75;
+        }
+      }
 
       if (level && level.ballSurfaceType !== this.previousSurface) {
         const surfaceColors: Partial<Record<SurfaceType, number>> = {
@@ -524,6 +556,7 @@ class Game {
     }
 
     this.momentumEffects.update(this.ball, dt, this.speedIntensity);
+    this.contactEffects.update(dt);
     this.camera.update(this.ball, this.speedIntensity, dt);
     this.renderer.updateSunTarget(
       this.ball.position.x,
@@ -533,9 +566,7 @@ class Game {
 
     if (this.screenShake > 0) {
       this.screenShake -= dt;
-      const intensity = this.screenShake * 0.3;
-      this.renderer.camera.position.x += (Math.random() - 0.5) * intensity;
-      this.renderer.camera.position.y += (Math.random() - 0.5) * intensity;
+      this.camera.addImpactImpulse(new THREE.Vector3(0, 1, 0), this.screenShake * 0.035);
     }
 
     this.debug.update(this.ball);

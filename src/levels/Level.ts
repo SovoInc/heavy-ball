@@ -215,6 +215,12 @@ export class Level {
     }
 
     if (this.ball) {
+      const finishPosition = this.finishZone.position;
+      const finishDistance = Math.hypot(
+        this.ball.body.position.x - finishPosition.x,
+        this.ball.body.position.z - finishPosition.z,
+      );
+      this.finishZone.setProximity(THREE.MathUtils.clamp(1 - finishDistance / 11, 0, 1));
       for (const wz of this.windZones) {
         wz.applyForce(this.ball);
       }
@@ -420,6 +426,35 @@ export class Level {
   updateFinish(dt: number, progress: number) {
     this.finishZone.setAbduction(progress);
     this.finishZone.update(dt);
+  }
+
+  findNearMiss(ballPosition: THREE.Vector3, distance: number): THREE.Vector3 | null {
+    let closest: THREE.Vector3 | null = null;
+    let closestDistance = distance;
+    for (const obstacle of this.obstacles) {
+      if (obstacle.destroyed) continue;
+      const position = obstacle.mesh.position;
+      const horizontal = Math.hypot(ballPosition.x - position.x, ballPosition.z - position.z);
+      const vertical = Math.abs(ballPosition.y - position.y);
+      if (horizontal > 0.68 && horizontal < closestDistance && vertical < 1.4) {
+        closestDistance = horizontal;
+        closest = position.clone();
+      }
+    }
+    return closest;
+  }
+
+  pulseNearbyRails(position: THREE.Vector3, strength: number) {
+    for (const segment of this.pathSegments) {
+      const [w, , d] = segment.size;
+      if (Math.abs(position.x - segment.mesh.position.x) <= w / 2 + 1.5 &&
+          Math.abs(position.z - segment.mesh.position.z) <= d / 2 + 1.5) {
+        segment.pulseRails(strength);
+      }
+    }
+    for (const segment of this.curvedPathSegments) {
+      if (segment.containsBall(position.x, position.z, 1.5)) segment.pulseRails(strength);
+    }
   }
 
   restoreBoxes() {

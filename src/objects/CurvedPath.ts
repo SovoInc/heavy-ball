@@ -50,6 +50,8 @@ export class CurvedPathSegment {
   private scene: THREE.Scene;
   private animTime = 0;
   private material: THREE.MeshStandardMaterial;
+  private railMaterial: THREE.MeshStandardMaterial | null = null;
+  private railPulse = 0;
   private surfaceTexture: THREE.Texture | null = null;
   private fireParticles: THREE.Points | null = null;
   private flameField: FlameField | null = null;
@@ -461,6 +463,11 @@ export class CurvedPathSegment {
 
   update(dt: number) {
     this.animTime += dt;
+    if (this.railMaterial) {
+      this.railPulse = Math.max(0, this.railPulse - dt * 3.8);
+      this.railMaterial.emissiveIntensity = COURSE_RAIL.emissiveIntensity + this.railPulse * 2.6;
+      this.railMaterial.opacity = Math.min(1, COURSE_RAIL.opacity + this.railPulse * 0.22);
+    }
 
     if (this.surfaceType === SurfaceType.Lava) {
       const pulse = 1.2 + Math.sin(this.animTime * 3) * 0.7;
@@ -655,6 +662,7 @@ export class CurvedPathSegment {
       COURSE_RAIL.opacity,
       COURSE_RAIL.emissiveIntensity,
     );
+    this.railMaterial = material;
     const tubeSegments = Math.max(8, Math.ceil(Math.abs(def.arcAngle) / (Math.PI / 32)));
     const topY = cy + def.height / 2 + COURSE_RAIL.elevation;
 
@@ -680,6 +688,10 @@ export class CurvedPathSegment {
       this.scene.add(trim);
       this.extraSceneObjects.push(trim);
     }
+  }
+
+  pulseRails(strength = 1) {
+    this.railPulse = Math.max(this.railPulse, THREE.MathUtils.clamp(strength, 0.25, 1.2));
   }
 
   private getSurfaceTexture(): THREE.Texture | undefined {

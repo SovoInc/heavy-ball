@@ -40,7 +40,8 @@ export class Renderer {
     // Native AA off: the composer's MSAA buffers handle it (and smooth the
     // platforms' alpha-hash dither).
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
-    const dpr = Math.min(window.devicePixelRatio, 2);
+    const quality = Renderer.detectQuality();
+    const dpr = Math.min(window.devicePixelRatio, quality === "high" ? 2 : quality === "medium" ? 1.5 : 1.15);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
     this.renderer.shadowMap.enabled = true;
@@ -58,7 +59,7 @@ export class Renderer {
 
     this.composer = new EffectComposer(this.renderer, {
       frameBufferType: THREE.HalfFloatType,
-      multisampling: 4,
+      multisampling: quality === "low" ? 0 : quality === "medium" ? 2 : 4,
     });
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     const bloom = new BloomEffect({
@@ -80,6 +81,15 @@ export class Renderer {
     this.backgroundManager = new BackgroundManager(this.scene);
 
     window.addEventListener("resize", this.onResize);
+  }
+
+  private static detectQuality(): "low" | "medium" | "high" {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const cores = navigator.hardwareConcurrency || 4;
+    const memory = nav.deviceMemory ?? 8;
+    if (memory <= 2 || cores <= 2) return "low";
+    if (memory <= 4 || cores <= 4) return "medium";
+    return "high";
   }
 
   sun!: THREE.DirectionalLight;

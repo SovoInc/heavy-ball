@@ -119,6 +119,8 @@ export class PathSegment {
   private animTime = 0;
   private static epsilonCounter = 0;
   private material: THREE.MeshStandardMaterial;
+  private railMaterial: THREE.MeshStandardMaterial | null = null;
+  private railPulse = 0;
   private surfaceTexture: THREE.Texture | null = null;
   private travelAxis: "x" | "z";
   private baseOpacity = PLATFORM_OPACITY;
@@ -502,6 +504,11 @@ export class PathSegment {
 
   update(dt: number) {
     this.animTime += dt;
+    if (this.railMaterial) {
+      this.railPulse = Math.max(0, this.railPulse - dt * 3.8);
+      this.railMaterial.emissiveIntensity = COURSE_RAIL.emissiveIntensity + this.railPulse * 2.6;
+      this.railMaterial.opacity = Math.min(1, COURSE_RAIL.opacity + this.railPulse * 0.22);
+    }
 
     if (this.surfaceType === SurfaceType.Lava) {
       // Pulsing glow
@@ -852,6 +859,7 @@ export class PathSegment {
         COURSE_RAIL.opacity,
         COURSE_RAIL.emissiveIntensity,
       );
+      this.railMaterial = edgeMaterial;
       const railInset = Math.min(COURSE_RAIL.inset, Math.min(w, d) * 0.1);
       const railHeight = 0.055;
       const railWidth = COURSE_RAIL.width;
@@ -926,6 +934,10 @@ export class PathSegment {
         this.mesh.add(strip);
       }
     }
+  }
+
+  pulseRails(strength = 1) {
+    this.railPulse = Math.max(this.railPulse, THREE.MathUtils.clamp(strength, 0.25, 1.2));
   }
 
   private getSurfaceTexture(): THREE.Texture | undefined {

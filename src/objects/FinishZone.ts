@@ -23,6 +23,7 @@ export class FinishZone {
   private center: THREE.Vector3;
   private discRadius: number;
   private abduction = 0;
+  private proximity = 0;
 
   constructor(scene: THREE.Scene, def: FinishZoneDef) {
     const [w, h, d] = def.size;
@@ -151,10 +152,10 @@ export class FinishZone {
 
   update(dt: number) {
     this.time += dt;
-    this.discMaterial.emissiveIntensity = 1.0 + Math.sin(this.time * 3) * 0.4;
-    this.swirlMesh.rotation.z += dt * (1.4 + this.abduction * 5);
+    this.discMaterial.emissiveIntensity = 1.0 + Math.sin(this.time * 3) * 0.4 + this.proximity * 0.7;
+    this.swirlMesh.rotation.z += dt * (1.4 + this.proximity * 1.2 + this.abduction * 5);
     this.swirlMat.opacity = Math.min(1, 0.85 + Math.sin(this.time * 3) * 0.12 + this.abduction * 0.18);
-    this.beamMat.opacity = Math.min(0.68, 0.24 + Math.sin(this.time * 2.5) * 0.1 + this.abduction * 0.3);
+    this.beamMat.opacity = Math.min(0.68, 0.2 + Math.sin(this.time * 2.5) * 0.08 + this.proximity * 0.18 + this.abduction * 0.3);
     this.beamMesh.scale.setScalar(1 - this.abduction * 0.12);
     this.torusMat.opacity = 0.85 + Math.sin(this.time * 3) * 0.15;
 
@@ -164,11 +165,11 @@ export class FinishZone {
 
     for (let i = 0; i < this.particleData.length; i++) {
       const pd = this.particleData[i];
-      pd.angle += pd.speed * dt * (1 + this.abduction * 4);
+      pd.angle += pd.speed * dt * (1 + this.proximity * 1.5 + this.abduction * 4);
       posArr.setXYZ(i,
-        Math.cos(pd.angle) * pd.r,
-        cy + 0.1 + Math.sin(pd.angle * 2) * 0.3,
-        Math.sin(pd.angle) * pd.r,
+        Math.cos(pd.angle) * pd.r * (1 - this.proximity * 0.12),
+        cy + 0.1 + Math.sin(pd.angle * 2) * 0.3 + this.proximity * (0.18 + (i % 5) * 0.09),
+        Math.sin(pd.angle) * pd.r * (1 - this.proximity * 0.12),
       );
     }
     posArr.needsUpdate = true;
@@ -176,6 +177,14 @@ export class FinishZone {
 
   setAbduction(progress: number) {
     this.abduction = THREE.MathUtils.clamp(progress, 0, 1);
+  }
+
+  setProximity(proximity: number) {
+    this.proximity = THREE.MathUtils.clamp(proximity, 0, 1);
+  }
+
+  get position(): THREE.Vector3 {
+    return this.center;
   }
 
   containsBall(ball: Ball): boolean {

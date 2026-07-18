@@ -8,6 +8,7 @@ export class GameCamera {
   private angle = 0;
   private currentFov = 55;
   private currentRoll = 0;
+  private impulse = new THREE.Vector3();
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   constructor(private camera: THREE.PerspectiveCamera) {}
@@ -35,6 +36,7 @@ export class GameCamera {
 
     this.currentPos.lerp(desiredPos, lerpSpeed);
     this.camera.position.copy(this.currentPos);
+    this.camera.position.add(this.impulse);
     this.camera.lookAt(this.target);
 
     const motionScale = this.reducedMotion ? 0.25 : 1;
@@ -51,11 +53,21 @@ export class GameCamera {
       * speedIntensity * motionScale;
     this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetRoll, Math.min(1, dt * 7));
     this.camera.rotateZ(this.currentRoll);
+    this.impulse.multiplyScalar(Math.pow(0.015, dt));
 
     this.angle = Math.atan2(
       this.camera.position.x - ballPos.x,
       this.camera.position.z - ballPos.z,
     );
+  }
+
+  addImpactImpulse(velocity: THREE.Vector3, strength: number) {
+    if (this.reducedMotion) return;
+    const direction = velocity.lengthSq() > 0.01
+      ? velocity.clone().normalize().multiplyScalar(-1)
+      : new THREE.Vector3(0, 1, 0);
+    direction.y = Math.max(0.12, direction.y + 0.16);
+    this.impulse.addScaledVector(direction.normalize(), THREE.MathUtils.clamp(strength, 0.025, 0.18));
   }
 
   snapTo(ball: Ball) {
@@ -75,6 +87,7 @@ export class GameCamera {
     this.camera.lookAt(this.target);
     this.currentFov = 55;
     this.currentRoll = 0;
+    this.impulse.set(0, 0, 0);
     this.camera.fov = 55;
     this.camera.updateProjectionMatrix();
   }
