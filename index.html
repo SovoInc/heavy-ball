@@ -522,6 +522,10 @@
         opacity: 0; transition: opacity 0.3s;
       }
       .elemental-bar-container.visible { opacity: 1; }
+      .elemental-bar-container[data-stage="3"] .elemental-bar,
+      .elemental-bar-container[data-stage="4"] .elemental-bar {
+        box-shadow: 0 0 12px currentColor;
+      }
       .elemental-bar-label {
         font-size: 11px; font-weight: 700;
         letter-spacing: 1px; text-transform: uppercase;
@@ -536,6 +540,23 @@
       .elemental-bar-fill {
         height: 100%; border-radius: 3px;
         transition: width 0.1s linear;
+      }
+      #hud-elemental.pulse-fire { animation: elemental-fire-pulse 0.42s ease-out; }
+      #hud-elemental.pulse-ice { animation: elemental-ice-pulse 0.42s ease-out; }
+      #hud-elemental.pulse-shock { animation: elemental-shock-pulse 0.42s ease-out; }
+      @keyframes elemental-fire-pulse {
+        45% { filter: drop-shadow(0 0 12px #ff4a08); transform: translateX(-3px); }
+      }
+      @keyframes elemental-ice-pulse {
+        45% { filter: drop-shadow(0 0 12px #24bfff); transform: translateX(-3px); }
+      }
+      @keyframes elemental-shock-pulse {
+        45% { filter: drop-shadow(0 0 15px #e8fbff); transform: scale(1.06); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #hud-elemental.pulse-fire,
+        #hud-elemental.pulse-ice,
+        #hud-elemental.pulse-shock { animation: none; }
       }
 
       /* ── Screen Overlays ── */

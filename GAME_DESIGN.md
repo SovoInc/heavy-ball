@@ -107,6 +107,8 @@ Drop chance from a broken box: **60%** (`dropChance: 0.6`). The specific drop is
 
 ## Elemental buildup system
 
+Elemental state transforms the whole selected ball rather than applying a flat tint. Fire and ice progress through four readable quarter stages: the base material, each profile's signature accents, and a restrained stress-shell lattice shift together; threshold crossings coordinate a short sound, HUD pulse, and world-space energy ring. Touching the opposing element while buildup remains produces a thermal-shock steam cue. Reduced-motion mode suppresses the HUD movement while retaining color/state information.
+
 A secondary state layer the ball accumulates from prolonged contact with specific surfaces and effects. Both meters drain when not building.
 
 ### Fire (red meter)

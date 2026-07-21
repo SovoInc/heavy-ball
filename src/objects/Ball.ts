@@ -3,7 +3,15 @@ import * as CANNON from "cannon-es";
 import { CONFIG } from "../config";
 import { Physics } from "../physics";
 import { BALL_PROFILES, DEFAULT_BALL_ID, type BallId, type BallProfile } from "../balls";
-import { elementalEmissive } from "../ballVisuals";
+import { elementalEmissive, elementalVisualState, type ElementalVisualState } from "../ballVisuals";
+
+type BallAccent = THREE.Object3D & {
+  userData: {
+    baseColor?: number;
+    baseOpacity?: number;
+    elementalShell?: boolean;
+  };
+};
 
 export class Ball {
   mesh: THREE.Mesh;
@@ -16,7 +24,7 @@ export class Ball {
   private abductionTime = 0;
   private abductionOrigin = new CANNON.Vec3();
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  private accents: THREE.Object3D[] = [];
+  private accents: BallAccent[] = [];
   private visualTime = 0;
   profile: BallProfile = BALL_PROFILES[DEFAULT_BALL_ID];
 
@@ -71,18 +79,51 @@ export class Ball {
         : new THREE.SphereGeometry(CONFIG.ball.radius, id === "magma" ? 48 : 64, id === "magma" ? 32 : 64);
     mat.color.setHex(this.profile.color);
     mat.emissive.setHex(this.profile.emissive);
-    mat.emissiveIntensity = id === "magma" ? 0.78 : id === "heavy" ? 0.62 : 0.42;
+    mat.emissiveIntensity = this.baseEmissiveIntensity();
     mat.metalness = id === "light" ? 0.2 : 0.62;
-    mat.roughness = id === "magma" ? 0.58 : id === "light" ? 0.12 : 0.25;
+    mat.roughness = this.baseRoughness();
     mat.map?.dispose();
     mat.map = Ball.createProfileTexture(this.profile);
     mat.needsUpdate = true;
     this.buildAccents(id);
   }
 
-  setElementalTint(fire: number, ice: number) {
+  setElementalTint(fire: number, ice: number): ElementalVisualState {
     const mat = this.mesh.material as THREE.MeshPhysicalMaterial;
+    const state = elementalVisualState(fire, ice);
     elementalEmissive(this.profile, fire, ice, mat.emissive);
+    mat.emissiveIntensity = this.baseEmissiveIntensity() + state.intensity * 0.72;
+    mat.roughness = THREE.MathUtils.clamp(
+      this.baseRoughness() + (state.kind === "ice" ? -0.08 : state.kind === "fire" ? 0.08 : 0) * state.intensity,
+      0.06,
+      0.72,
+    );
+
+    for (const accent of this.accents) {
+      if (!(accent instanceof THREE.Mesh)) continue;
+      const accentMat = accent.material as THREE.MeshBasicMaterial;
+      if (accent.userData.elementalShell) {
+        accent.visible = state.kind !== "neutral";
+        accentMat.color.copy(state.accent);
+        accentMat.opacity = state.shellOpacity;
+        accent.scale.setScalar(1 + state.stage * 0.006);
+        continue;
+      }
+
+      const baseColor = new THREE.Color(accent.userData.baseColor ?? 0xffffff);
+      accentMat.color.copy(baseColor).lerp(state.accent, state.intensity * 0.82);
+      const baseOpacity = accent.userData.baseOpacity ?? 0.8;
+      accentMat.opacity = Math.min(1, baseOpacity + state.stage * 0.035);
+    }
+    return state;
+  }
+
+  private baseEmissiveIntensity() {
+    return this.profile.id === "magma" ? 0.78 : this.profile.id === "heavy" ? 0.62 : 0.42;
+  }
+
+  private baseRoughness() {
+    return this.profile.id === "magma" ? 0.58 : this.profile.id === "light" ? 0.12 : 0.25;
   }
 
   private buildAccents(id: BallId) {
@@ -99,7 +140,16 @@ export class Ball {
     const glowMaterial = (color: number, opacity = 0.9) => new THREE.MeshBasicMaterial({
       color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending,
     });
-    const add = (object: THREE.Object3D) => { this.mesh.add(object); this.accents.push(object); };
+    const add = (object: BallAccent, elementalShell = false) => {
+      if (object instanceof THREE.Mesh) {
+        const material = object.material as THREE.MeshBasicMaterial;
+        object.userData.baseColor = material.color.getHex();
+        object.userData.baseOpacity = material.opacity;
+        object.userData.elementalShell = elementalShell;
+      }
+      this.mesh.add(object);
+      this.accents.push(object);
+    };
 
     if (id === "core") {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.505, 0.014, 8, 72), glowMaterial(0x62d9ff, 0.72));
@@ -134,6 +184,20 @@ export class Ball {
       const furnace = new THREE.Mesh(new THREE.IcosahedronGeometry(0.39, 2), glowMaterial(0xff2500, 0.34));
       add(furnace);
     }
+
+    const elementalShell = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.522, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    ) as BallAccent;
+    elementalShell.visible = false;
+    add(elementalShell, true);
   }
 
   setPosition(x: number, y: number, z: number) {

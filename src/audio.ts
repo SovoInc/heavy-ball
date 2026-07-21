@@ -331,6 +331,42 @@ export function playFreeze() {
   noise.stop(now + 0.3);
 }
 
+/** Short staged warning as elemental buildup crosses a quarter threshold. */
+export function playElementalThreshold(kind: "fire" | "ice", stage: number) {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  osc.type = kind === "fire" ? "sawtooth" : "sine";
+  const base = kind === "fire" ? 190 : 780;
+  osc.frequency.setValueAtTime(base * (1 + stage * 0.22), now);
+  osc.frequency.exponentialRampToValueAtTime(base * (kind === "fire" ? 0.72 : 1.45), now + 0.13);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.035 + stage * 0.012, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.15);
+}
+
+/** Steam-like hiss when one element actively strips away the other. */
+export function playThermalShock() {
+  const ac = getCtx();
+  const now = ac.currentTime;
+  const noise = ac.createBufferSource();
+  noise.buffer = makeNoise(ac, 0.24);
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(2400, now);
+  bp.frequency.exponentialRampToValueAtTime(900, now + 0.22);
+  bp.Q.value = 0.7;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.09, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+  noise.connect(bp).connect(gain).connect(ac.destination);
+  noise.start(now);
+  noise.stop(now + 0.25);
+}
+
 /** Rising magnetic beam — ball is pulled out of the finish portal. */
 export function playAbduction() {
   const ac = getCtx();

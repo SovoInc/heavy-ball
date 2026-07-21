@@ -72,6 +72,7 @@ export class HUD {
   private eventFlashEl: HTMLElement;
   private deltaEl: HTMLElement;
   private bestTimeMs: number | null = null;
+  private elementalPulseTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private elapsedMs = 0;
   private running = false;
@@ -307,14 +308,27 @@ export class HUD {
 
     if (fireVisible) {
       this.fireBarFill.style.width = `${fire * 100}%`;
+      this.fireBarContainer.dataset.stage = String(fire >= 1 ? 4 : Math.floor(fire * 4));
     }
     if (iceVisible) {
       this.iceBarFill.style.width = `${ice * 100}%`;
+      this.iceBarContainer.dataset.stage = String(ice >= 1 ? 4 : Math.floor(ice * 4));
     }
 
     // Screen vignette overlays
     this.fireOverlay.style.opacity = fire > 0.1 ? String(fire * 0.8) : "0";
     this.iceOverlay.style.opacity = ice > 0.1 ? String(ice * 0.8) : "0";
+  }
+
+  pulseElemental(kind: "fire" | "ice" | "shock", stage = 1) {
+    const target = kind === "fire" ? this.fireBarContainer : kind === "ice" ? this.iceBarContainer : null;
+    if (target) target.dataset.stage = String(stage);
+    const hud = document.getElementById("hud-elemental")!;
+    hud.classList.remove("pulse-fire", "pulse-ice", "pulse-shock");
+    void hud.offsetWidth;
+    hud.classList.add(`pulse-${kind}`);
+    if (this.elementalPulseTimeout) clearTimeout(this.elementalPulseTimeout);
+    this.elementalPulseTimeout = setTimeout(() => hud.classList.remove(`pulse-${kind}`), 420);
   }
 
   showWalletLogin() {

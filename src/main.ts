@@ -8,7 +8,7 @@ import { LevelManager } from "./levels/LevelManager";
 import { HUD } from "./hud";
 import { CONFIG } from "./config";
 import { DebugRenderer } from "./debug";
-import { playAbduction, playFall, playImpactAccent, playLevelComplete, playNearMiss, playPowerUp, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
+import { playAbduction, playElementalThreshold, playFall, playImpactAccent, playLevelComplete, playNearMiss, playPowerUp, playThermalShock, updateRoll, playFireCrackle, playIceCreak, playFreeze } from "./audio";
 import { ElementalBuildup } from "./elemental/ElementalBuildup";
 import { PowerUpManager } from "./powerups/PowerUpManager";
 import { PowerUpType } from "./powerups/PowerUpType";
@@ -19,6 +19,7 @@ import { MomentumEffects } from "./effects/MomentumEffects";
 import { ContactEffects } from "./effects/ContactEffects";
 import { SurfaceType } from "./objects/Path";
 import { BALL_PROFILES, DEFAULT_BALL_ID, ballVersionKey, isBallId, type BallId } from "./balls";
+import type { ElementalKind } from "./ballVisuals";
 
 type GameState = "menu" | "playing" | "finishing" | "levelComplete" | "allComplete";
 
@@ -53,6 +54,18 @@ class Game {
   private currentBestMs: number | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private selectedBall: BallId = DEFAULT_BALL_ID;
+  private elementalStage = 0;
+  private elementalKind: ElementalKind = "neutral";
+  private thermalShockCooldown = 0;
+
+  private resetElementalPresentation() {
+    this.elementalBuildup.reset();
+    this.elementalStage = 0;
+    this.elementalKind = "neutral";
+    this.thermalShockCooldown = 0;
+    this.ball.setElementalTint(0, 0);
+    this.hud.updateElementalBuildup(0, 0);
+  }
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -272,7 +285,7 @@ class Game {
     this.speedBoosts = 0;
     this.sessionToken = "";
     this.powerUpManager.reset();
-    this.elementalBuildup.reset();
+    this.resetElementalPresentation();
     this.ball.resetScale();
     this.currentBallScale = 1;
     this.speedIntensity = 0;
@@ -395,6 +408,10 @@ class Game {
         const wasFrozen = this.elementalBuildup.frozen;
         this.elementalBuildup.onFire = lvl.ballOnLava;
         this.elementalBuildup.onIce = lvl.ballOnIce;
+        const thermalShock = (
+          (this.elementalBuildup.onFire && this.elementalBuildup.ice > 0.04)
+          || (this.elementalBuildup.onIce && this.elementalBuildup.fire > 0.04)
+        );
         this.elementalBuildup.update(dt, this.powerUpManager.hasShield());
 
         // Freeze trigger sound
@@ -402,7 +419,27 @@ class Game {
           playFreeze();
         }
 
-        this.ball.setElementalTint(this.elementalBuildup.fire, this.elementalBuildup.ice);
+        const elementalVisual = this.ball.setElementalTint(this.elementalBuildup.fire, this.elementalBuildup.ice);
+        if (elementalVisual.kind !== this.elementalKind) {
+          this.elementalKind = elementalVisual.kind;
+          this.elementalStage = 0;
+        }
+        if (elementalVisual.stage > this.elementalStage && elementalVisual.kind !== "neutral") {
+          this.elementalStage = elementalVisual.stage;
+          playElementalThreshold(elementalVisual.kind, elementalVisual.stage);
+          this.hud.pulseElemental(elementalVisual.kind, elementalVisual.stage);
+          this.momentumEffects.burst(this.ball.mesh.position, elementalVisual.accent.getHex(), 0.7 + elementalVisual.stage * 0.12);
+        } else if (elementalVisual.stage < this.elementalStage) {
+          this.elementalStage = elementalVisual.stage;
+        }
+
+        this.thermalShockCooldown = Math.max(0, this.thermalShockCooldown - dt);
+        if (thermalShock && this.thermalShockCooldown <= 0) {
+          playThermalShock();
+          this.hud.pulseElemental("shock");
+          this.momentumEffects.burst(this.ball.mesh.position, 0xe8fbff, 0.85);
+          this.thermalShockCooldown = 0.7;
+        }
 
         // Elemental ambient sounds
         this.elementalSoundTimer -= dt;
@@ -499,8 +536,7 @@ class Game {
       updateRoll(speed);
 
       if (this.ball.position.y < CONFIG.world.fallThreshold) {
-        this.elementalBuildup.reset();
-        this.hud.updateElementalBuildup(0, 0);
+        this.resetElementalPresentation();
         if (!this.powerUpManager.hasShield()) {
           playFall();
           this.hud.showEventFlash("fall");
@@ -529,8 +565,7 @@ class Game {
         const timeMs = this.hud.stopTimer();
         this.controls.setEnabled(false);
         this.hud.clearPowerUps();
-        this.elementalBuildup.reset();
-        this.hud.updateElementalBuildup(0, 0);
+        this.resetElementalPresentation();
 
         this.submitScore(timeMs);
 
