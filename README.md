@@ -32,7 +32,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173/g/heavy-ball/`), connect a
 | **R** | Restart level |
 | Virtual joystick (touch) | Roll in joystick direction |
 
-The ball **cannot jump**. All vertical traversal comes from bounce surfaces, ramps, or gravity.
+The selected ball **cannot jump**. Core, Reactor, Cryosphere, and Magma have distinct handling profiles; all vertical traversal comes from bounce surfaces, ramps, or gravity. Each class has its own versioned per-level records.
 
 ## Documentation
 

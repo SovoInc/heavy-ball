@@ -10,6 +10,10 @@ struct SessionClaims {
     sid: String,
     sub: i64,       // player_id
     level: i64,
+    #[serde(default = "default_ball_id")]
+    ball_id: String,
+    #[serde(default = "default_physics_version")]
+    physics_version: i64,
     iat: u64,
     exp: u64,
 }
@@ -27,7 +31,14 @@ pub struct ScoreClaims {
     pub fire_maxed: bool,
     #[serde(default)]
     pub ice_maxed: bool,
+    #[serde(default = "default_ball_id")]
+    pub ball_id: String,
+    #[serde(default = "default_physics_version")]
+    pub physics_version: i64,
 }
+
+fn default_ball_id() -> String { "core".to_string() }
+fn default_physics_version() -> i64 { 1 }
 
 pub struct AppState {
     jwt_secret: String,
@@ -49,6 +60,8 @@ impl AppState {
         session_id: &str,
         player_id: i64,
         level: i64,
+        ball_id: &str,
+        physics_version: i64,
         wallet_address: &str,
     ) -> Result<String, String> {
         let now = std::time::SystemTime::now()
@@ -60,6 +73,8 @@ impl AppState {
             sid: session_id.to_string(),
             sub: player_id,
             level,
+            ball_id: ball_id.to_string(),
+            physics_version,
             iat: now,
             exp: now + SESSION_MAX_SECS,
         };
@@ -78,7 +93,7 @@ impl AppState {
         &self,
         token: &str,
         wallet_address: &str,
-    ) -> Result<(String, i64, i64, i64), String> {
+    ) -> Result<(String, i64, i64, String, i64, i64), String> {
         let key = self.signing_key(wallet_address);
         let validation = Validation::default();
 
@@ -96,7 +111,7 @@ impl AppState {
             .as_secs();
 
         let elapsed_ms = ((now - claims.iat) * 1000) as i64;
-        Ok((claims.sid, claims.sub, claims.level, elapsed_ms))
+        Ok((claims.sid, claims.sub, claims.level, claims.ball_id, claims.physics_version, elapsed_ms))
     }
 
     /// Decode the client-signed score JWT using the session token string as HMAC key.
@@ -127,6 +142,8 @@ impl AppState {
             speed_boosts: c.speed_boosts,
             fire_maxed: c.fire_maxed,
             ice_maxed: c.ice_maxed,
+            ball_id: c.ball_id,
+            physics_version: c.physics_version,
         })
     }
 }

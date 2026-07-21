@@ -22,7 +22,14 @@ pub struct PlayerResponse {
 pub struct SessionStartRequest {
     pub player_id: i64,
     pub level: i64,
+    #[serde(default = "default_ball_id")]
+    pub ball_id: String,
+    #[serde(default = "default_physics_version")]
+    pub physics_version: i64,
 }
+
+fn default_ball_id() -> String { "core".to_string() }
+fn default_physics_version() -> i64 { 1 }
 
 #[derive(Debug, Serialize)]
 pub struct SessionStartResponse {
@@ -49,6 +56,10 @@ pub struct ScorePayload {
     pub fire_maxed: bool,
     #[serde(default)]
     pub ice_maxed: bool,
+    #[serde(default = "default_ball_id")]
+    pub ball_id: String,
+    #[serde(default = "default_physics_version")]
+    pub physics_version: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,6 +99,8 @@ pub struct LevelQuery {
     pub level: Option<i64>,
     pub limit: Option<i64>,
     pub network_id: Option<String>,
+    pub ball_id: Option<String>,
+    pub physics_version: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

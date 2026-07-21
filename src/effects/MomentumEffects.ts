@@ -80,6 +80,14 @@ export class MomentumEffects {
     }
 
     const visibleIntensity = intensity < 0.16 ? 0 : (intensity - 0.16) / 0.84;
+    const profileColor = new THREE.Color(ball.profile.trail);
+    const peakColor = ball.profile.id === "magma"
+      ? new THREE.Color(0xffe06a)
+      : ball.profile.id === "heavy"
+        ? new THREE.Color(0xffffff)
+        : ball.profile.id === "light"
+          ? new THREE.Color(0xeaffff)
+          : HOT;
     const wakeLength = this.reducedMotion ? 8 : this.wake.length;
     for (let i = 0; i < this.wake.length; i++) {
       const node = this.wake[i];
@@ -98,7 +106,7 @@ export class MomentumEffects {
       );
       const thickness = (0.45 + life * 0.75) * (0.4 + visibleIntensity * 0.7);
       node.mesh.scale.set(thickness, length, thickness);
-      node.mesh.material.color.copy(COOL).lerp(HOT, Math.max(0, intensity - 0.58) / 0.42);
+      node.mesh.material.color.copy(profileColor).lerp(peakColor, Math.max(0, intensity - 0.58) / 0.42);
       node.mesh.material.opacity = life * visibleIntensity * 0.82;
     }
 

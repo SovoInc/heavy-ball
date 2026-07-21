@@ -27,6 +27,8 @@ export interface RunData {
   speed_boosts: number;
   fire_maxed: boolean;
   ice_maxed: boolean;
+  ball_id: string;
+  physics_version: number;
 }
 
 export interface SessionResponse {
@@ -132,16 +134,16 @@ export const api = {
   registerWallet: (walletAddress: string, networkId: string) =>
     post<PlayerData>("/api/wallet", { wallet_address: walletAddress, network_id: networkId }),
 
-  startSession: (playerId: number, level: number) =>
-    post<SessionResponse>("/api/session/start", { player_id: playerId, level }),
+  startSession: (playerId: number, level: number, ballId: string, physicsVersion: number) =>
+    post<SessionResponse>("/api/session/start", { player_id: playerId, level, ball_id: ballId, physics_version: physicsVersion }),
 
   submitScore: async (data: RunData, sessionToken: string): Promise<ScoreResult> => {
     const scoreToken = await signScoreJWT(data, sessionToken);
     return post<ScoreResult>("/api/scores", { session_token: sessionToken, score_token: scoreToken });
   },
 
-  getTopScores: (level: number, limit = 20, networkId?: string) =>
-    get<ScoreEntry[]>(`/api/scores/top?level=${level}&limit=${limit}${networkId ? `&network_id=${networkId}` : ""}`),
+  getTopScores: (level: number, ballId: string, physicsVersion: number, limit = 20, networkId?: string) =>
+    get<ScoreEntry[]>(`/api/scores/top?level=${level}&ball_id=${encodeURIComponent(ballId)}&physics_version=${physicsVersion}&limit=${limit}${networkId ? `&network_id=${networkId}` : ""}`),
 
   getPlayerStats: (playerId: number) =>
     get<PlayerStatsData>(`/api/stats/player/${playerId}`),

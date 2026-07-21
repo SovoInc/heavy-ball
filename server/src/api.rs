@@ -12,6 +12,7 @@ const MAX_BOXES: i64 = 500;       // Generous upper bound per run
 const MAX_POWER_UPS: i64 = 200;
 const MAX_FALLS: i64 = 1_000;
 const MAX_SPEED_BOOSTS: i64 = 500;
+const BALL_IDS: [&str; 4] = ["core", "heavy", "light", "magma"];
 
 /// Extract and validate auth token from Authorization header.
 /// Returns the authenticated player_id, or None if invalid/missing.
@@ -52,6 +53,9 @@ fn is_valid_wallet_address(addr: &str) -> bool {
 }
 
 fn validate_score(body: &ScorePayload) -> Option<&'static str> {
+    if !BALL_IDS.contains(&body.ball_id.as_str()) || body.physics_version != 1 {
+        return Some("invalid ball profile");
+    }
     if body.level < MIN_LEVEL || body.level > MAX_LEVEL {
         return Some("level must be between 1 and 100");
     }
@@ -87,6 +91,9 @@ async fn post_session_start(
     if body.level < MIN_LEVEL || body.level > MAX_LEVEL {
         return HttpResponse::BadRequest().json(serde_json::json!({ "error": "level must be between 1 and 100" }));
     }
+    if !BALL_IDS.contains(&body.ball_id.as_str()) || body.physics_version != 1 {
+        return HttpResponse::BadRequest().json(serde_json::json!({ "error": "invalid ball profile" }));
+    }
 
     // Level progression: level 1 always allowed, level N requires N-1 completed
     if body.level > 1 {
@@ -107,13 +114,13 @@ async fn post_session_start(
     };
 
     // Create DB session row
-    let session_id = match db.create_session(body.player_id, body.level) {
+    let session_id = match db.create_session(body.player_id, body.level, &body.ball_id, body.physics_version) {
         Ok(id) => id,
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
 
     // Create JWT signed with server_secret + wallet_address
-    match app.create_session_token(&session_id, body.player_id, body.level, &wallet) {
+    match app.create_session_token(&session_id, body.player_id, body.level, &body.ball_id, body.physics_version, &wallet) {
         Ok(token) => HttpResponse::Ok().json(SessionStartResponse { session_token: token }),
         Err(e) => HttpResponse::InternalServerError().body(e),
     }
@@ -170,19 +177,19 @@ async fn post_score(req: HttpRequest, db: web::Data<Db>, app: web::Data<AppState
     };
 
     // 5. Validate session JWT (signed with server_secret + wallet_address)
-    let (session_id, session_pid, session_level, elapsed_ms) =
+    let (session_id, session_pid, session_level, session_ball, session_version, elapsed_ms) =
         match app.validate_session_token(&body.session_token, &wallet) {
             Ok(v) => v,
             Err(msg) => return HttpResponse::BadRequest().json(serde_json::json!({ "error": msg })),
         };
 
     // 6. Cross-check: session claims must match score claims
-    if session_pid != score.player_id || session_level != score.level {
+    if session_pid != score.player_id || session_level != score.level || session_ball != score.ball_id || session_version != score.physics_version {
         return HttpResponse::BadRequest().json(serde_json::json!({ "error": "session/score mismatch" }));
     }
 
     // 7. Consume the DB session (one-time use)
-    match db.consume_session(&session_id, score.player_id, score.level) {
+    match db.consume_session(&session_id, score.player_id, score.level, &score.ball_id, score.physics_version) {
         Ok(true) => {},
         Ok(false) => return HttpResponse::BadRequest().json(serde_json::json!({ "error": "session already used or invalid" })),
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
@@ -202,6 +209,7 @@ async fn post_score(req: HttpRequest, db: web::Data<Db>, app: web::Data<AppState
         score.boxes_broken, score.power_ups_collected,
         score.fall_count, score.speed_boosts,
         score.fire_maxed, score.ice_maxed,
+        &score.ball_id, score.physics_version,
     ) {
         Ok(id) => id,
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
@@ -231,7 +239,9 @@ async fn get_top_scores(db: web::Data<Db>, query: web::Query<LevelQuery>) -> Htt
     let level = query.level.unwrap_or(1);
     let limit = query.limit.unwrap_or(20).min(100);
     let network_id = query.network_id.as_deref().unwrap_or("mainnet");
-    match db.top_scores(level, limit, network_id) {
+    let ball_id = query.ball_id.as_deref().unwrap_or("core");
+    let physics_version = query.physics_version.unwrap_or(1);
+    match db.top_scores(level, ball_id, physics_version, limit, network_id) {
         Ok(rows) => {
             let entries: Vec<ScoreEntry> = rows.into_iter().enumerate().map(|(i, (display_name, wallet_address, time_ms, pid))| {
                 let alias = display_name.clone();

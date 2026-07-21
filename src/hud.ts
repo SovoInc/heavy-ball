@@ -2,6 +2,10 @@ import { PowerUpType } from "./powerups/PowerUpType";
 import { CONFIG } from "./config";
 import { api, type ScoreEntry, type LeaderboardEntry, type AchievementEntry, getDisplayName } from "./api";
 import "./midnight";
+import { BALL_IDS, BALL_PROFILES, DEFAULT_BALL_ID, type BallId } from "./balls";
+import * as THREE from "three";
+import { Ball } from "./objects/Ball";
+import { Physics } from "./physics";
 
 const ACHIEVEMENT_DEFS: Record<string, { name: string; desc: string; icon: string }> = {
   first_finish:   { name: "First Finish",    desc: "Complete any level",                  icon: "\u{1F3C1}" },
@@ -82,6 +86,11 @@ export class HUD {
   onWalletConnect?: () => void;
   onWalletDisconnect?: () => void;
   onDemo?: () => void;
+  onBallSelect?: (id: BallId) => void;
+  selectedBall: BallId = DEFAULT_BALL_ID;
+  private ballPreviews: Array<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; ball: Ball }> = [];
+  private ballPreviewFrame = 0;
+  private ballPreviewLastTime = 0;
 
   constructor() {
     this.levelEl = document.getElementById("hud-level")!;
@@ -129,6 +138,11 @@ export class HUD {
     this.restartBtn.addEventListener("click", () => this.onGiveUp?.());
     this.overlayBtns.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
+      const ballChoice = target.closest<HTMLElement>("[data-ball-id]");
+      if (ballChoice?.dataset.ballId) {
+        this.selectBall(ballChoice.dataset.ballId as BallId);
+        return;
+      }
       if (target.id === "btn-start") this.onStart?.();
       if (target.id === "btn-continue") {
         const level = parseInt(target.dataset.level ?? "0");
@@ -165,6 +179,8 @@ export class HUD {
   }
 
   private resetOverlay() {
+    this.stopBallPreviews();
+    this.overlayContent.classList.remove("has-ball-bay");
     this.overlayTime.style.display = "none";
     this.leaderboardPanel.style.display = "none";
     this.achievementsPanel.style.display = "none";
@@ -353,6 +369,7 @@ export class HUD {
 
   showStartScreen(continueLevel = 0, playerIdentifier?: string, playerId = 0) {
     this.resetOverlay();
+    this.overlayContent.classList.add("has-ball-bay");
     this.overlayH1.textContent = "Heavy Ball";
 
     const badge = playerIdentifier
@@ -360,8 +377,8 @@ export class HUD {
       : "";
 
     const subtitle = continueLevel > 0
-      ? `Level ${continueLevel} completed`
-      : "Build momentum. Survive the course.";
+      ? `Level ${continueLevel} completed · choose your next machine`
+      : "Choose your machine. Every ball owns its records.";
 
     this.overlaySubtitle.innerHTML = subtitle;
 
@@ -384,6 +401,7 @@ export class HUD {
 
     if (continueLevel > 0) {
       this.overlayBtns.innerHTML = `
+        ${this.ballChooserMarkup()}
         <button class="overlay-btn primary" id="btn-continue" data-level="${continueLevel}">Continue &mdash; Level ${continueLevel + 1}</button>
         <button class="overlay-btn secondary" id="btn-start">New Game</button>
         ${leaderboardBtn}
@@ -392,6 +410,7 @@ export class HUD {
       `;
     } else {
       this.overlayBtns.innerHTML = `
+        ${this.ballChooserMarkup()}
         <button class="overlay-btn primary" id="btn-start">Roll now</button>
         ${leaderboardBtn}
         ${achievementsBtn}
@@ -399,6 +418,100 @@ export class HUD {
       `;
     }
     this.overlay.classList.remove("hidden");
+    requestAnimationFrame(() => this.startBallPreviews());
+  }
+
+  setSelectedBall(id: BallId) {
+    this.selectedBall = id;
+    document.querySelectorAll<HTMLElement>(".ball-choice").forEach((el) => {
+      el.classList.toggle("selected", el.dataset.ballId === id);
+      el.setAttribute("aria-pressed", String(el.dataset.ballId === id));
+    });
+    const profile = BALL_PROFILES[id];
+    document.documentElement.style.setProperty("--selected-ball", profile.trail);
+  }
+
+  private selectBall(id: BallId) {
+    if (!BALL_PROFILES[id]) return;
+    this.setSelectedBall(id);
+    this.onBallSelect?.(id);
+  }
+
+  private ballChooserMarkup(): string {
+    return `<div class="ball-bay" role="group" aria-label="Choose a ball">
+      ${BALL_IDS.map((id) => {
+        const ball = BALL_PROFILES[id];
+        const bars = Object.entries(ball.stats).map(([label, value]) => `
+          <span class="ball-stat" title="${label}: ${value}"><i style="--stat:${value}%"></i></span>`).join("");
+        return `<button class="ball-choice ball-${id}${id === this.selectedBall ? " selected" : ""}"
+          data-ball-id="${id}" aria-pressed="${id === this.selectedBall}">
+          <span class="ball-orb" aria-hidden="true"><canvas class="ball-preview" data-preview-ball="${id}"></canvas></span>
+          <span class="ball-copy"><strong>${ball.name}</strong><small>${ball.role}</small></span>
+          <span class="ball-stats" aria-label="Acceleration, momentum, control, bounce">${bars}</span>
+          <span class="ball-description">${ball.description}</span>
+        </button>`;
+      }).join("")}
+    </div>`;
+  }
+
+  private startBallPreviews() {
+    this.stopBallPreviews();
+    document.querySelectorAll<HTMLCanvasElement>(".ball-preview").forEach((canvas) => {
+      const id = canvas.dataset.previewBall as BallId;
+      if (!BALL_PROFILES[id]) return;
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(112, 112, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.35;
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xc8efff, 0x080a12, 2.2));
+      const key = new THREE.DirectionalLight(0xffffff, 4.5);
+      key.position.set(-2, 3, 4);
+      scene.add(key);
+      const rim = new THREE.PointLight(BALL_PROFILES[id].trail, 8, 5);
+      rim.position.set(2, -1, 2);
+      scene.add(rim);
+      const physics = new Physics();
+      const ball = new Ball(scene, physics);
+      ball.setProfile(id);
+      ball.body.position.set(0, 0, 0);
+      ball.syncMesh();
+      const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
+      camera.position.set(0, 0.15, 2.45);
+      camera.lookAt(0, 0, 0);
+      scene.userData.camera = camera;
+      this.ballPreviews.push({ renderer, scene, ball });
+    });
+    this.ballPreviewLastTime = performance.now();
+    const render = (now: number) => {
+      if (this.ballPreviews.length === 0) return;
+      const dt = Math.min((now - this.ballPreviewLastTime) / 1000, 0.05);
+      this.ballPreviewLastTime = now;
+      for (const preview of this.ballPreviews) {
+        preview.ball.body.velocity.set(0.45, 0, -0.7);
+        preview.ball.syncMesh(dt);
+        preview.ball.mesh.rotateY(dt * 0.55);
+        preview.renderer.render(preview.scene, preview.scene.userData.camera);
+      }
+      this.ballPreviewFrame = requestAnimationFrame(render);
+    };
+    this.ballPreviewFrame = requestAnimationFrame(render);
+  }
+
+  private stopBallPreviews() {
+    cancelAnimationFrame(this.ballPreviewFrame);
+    for (const preview of this.ballPreviews) {
+      preview.scene.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.geometry.dispose();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => material.dispose());
+      });
+      preview.renderer.dispose();
+    }
+    this.ballPreviews = [];
   }
 
   showLevelComplete(timeMs: number, isLastLevel: boolean, levelNumber?: number, personalBest = false) {
@@ -442,6 +555,7 @@ export class HUD {
   private savedMenuState: { buttons: string; title: string; subtitle: string; badges: string } | null = null;
 
   private showLeaderboardView() {
+    this.stopBallPreviews();
     // Save current menu state
     const badges: string[] = [];
     this.overlayContent.querySelectorAll(".player-badge").forEach(el => {
@@ -472,10 +586,12 @@ export class HUD {
         this.overlaySubtitle.insertAdjacentHTML("beforebegin", this.savedMenuState.badges);
       }
       this.savedMenuState = null;
+      requestAnimationFrame(() => this.startBallPreviews());
     }
   }
 
   private showAchievementsView() {
+    this.stopBallPreviews();
     const badges: string[] = [];
     this.overlayContent.querySelectorAll(".player-badge").forEach(el => {
       badges.push(el.outerHTML);
@@ -505,6 +621,7 @@ export class HUD {
         this.overlaySubtitle.insertAdjacentHTML("beforebegin", this.savedMenuState.badges);
       }
       this.savedMenuState = null;
+      requestAnimationFrame(() => this.startBallPreviews());
     }
   }
 
@@ -606,9 +723,11 @@ export class HUD {
 
     this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>Loading...</p>";
     this.showLeaderboardView();
+    this.overlayH1.textContent = `${BALL_PROFILES[this.selectedBall].name} records`;
 
     try {
-      const scores = await api.getTopScores(level, 20, this.networkId || undefined);
+      const profile = BALL_PROFILES[this.selectedBall];
+      const scores = await api.getTopScores(level, profile.id, profile.version, 20, this.networkId || undefined);
       if (scores.length === 0) {
         this.leaderboardPanel.innerHTML = "<p style='text-align:center;opacity:0.4;padding:20px;font-size:13px'>No scores yet</p>";
         return;

@@ -1,6 +1,6 @@
 # Heavy Ball — Game Design Summary & Ruleset
 
-A 3D physics platformer. The player rolls a heavy ball along a procedurally lit, sci-fi-styled track and must reach the green finish zone without falling off. 100 hand-authored levels, increasing in difficulty. Time is tracked per level; faster runs rank higher on the per-network leaderboard.
+A 3D physics platformer. The player chooses a ball class, then rolls it along a procedurally lit, sci-fi-styled track and must reach the green finish zone without falling off. There are 100 hand-authored levels of increasing difficulty. Time is tracked per level and immutable ball physics version; faster like-for-like runs rank higher on the per-network leaderboard.
 
 This document covers design pillars, mechanics, and the gameplay ruleset. For level-authoring rules (gap sizes, surface lengths, etc.), see [LEVEL_DESIGN.md](LEVEL_DESIGN.md). For server-side anti-cheat, see [ANTI_CHEAT.md](ANTI_CHEAT.md).
 
@@ -124,6 +124,10 @@ This system gives long levels a runaway-state dimension: pushing too hard or too
 ---
 
 ## Scoring & leaderboards
+
+- **Ball classes:** Core/Balanced, Reactor/Heavy, Cryosphere/Light, and Magma/Elastic use distinct mass, drive, speed, damping, grip, and rebound profiles.
+- **Per-ball records:** per-level scores are partitioned by `ball_id` and `physics_version`. Existing scores are `core:v1`; released profiles are versioned rather than silently retuned.
+- **Run binding:** the server-issued session binds the chosen ball/version before play, and score submission must match it.
 
 - **Per-level metric:** `time_ms` (run duration in milliseconds).
 - **Leaderboard:** `GET /api/leaderboard` returns players ranked by `max_level` (primary) then `total_time_ms` (secondary, ascending).

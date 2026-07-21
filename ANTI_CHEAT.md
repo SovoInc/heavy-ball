@@ -16,13 +16,13 @@ The Heavy Ball server uses a multi-layered approach to prevent score manipulatio
 Before a level starts, the client must request a session from the server:
 
 ```
-POST /api/session/start  { player_id, level }
+POST /api/session/start  { player_id, level, ball_id, physics_version }
 ```
 
 The server:
 1. Verifies the player has completed the previous level (level progression gating).
 2. Creates a session row in the `sessions` table (UUID primary key).
-3. Returns a **JWT signed with `server_secret + wallet_address`** containing the session ID, player ID, level, and timestamps.
+3. Returns a **JWT signed with `server_secret + wallet_address`** containing the session ID, player ID, level, immutable ball ID/physics version, and timestamps.
 
 The JWT secret is randomly generated on each server restart, invalidating all prior session tokens.
 
@@ -43,7 +43,7 @@ When submitting a score, the client does **not** send raw JSON. Instead:
 The server:
 1. Decodes `score_token` using `session_token` as the HMAC key — rejects if the signature is invalid.
 2. Validates `session_token` using `server_secret + wallet_address` — rejects if forged or expired.
-3. Cross-checks that player ID and level match between both tokens.
+3. Cross-checks that player ID, level, ball ID, and physics version match between both tokens.
 
 ### Why this matters
 
@@ -57,7 +57,8 @@ Each session token can only be used **once**. The server tracks this in the data
 
 ```sql
 UPDATE sessions SET used = 1
-WHERE id = ?1 AND player_id = ?2 AND level = ?3 AND used = 0
+WHERE id = ?1 AND player_id = ?2 AND level = ?3
+  AND ball_id = ?4 AND physics_version = ?5 AND used = 0
 ```
 
 If the session was already consumed, the submission is rejected. This prevents replay attacks.

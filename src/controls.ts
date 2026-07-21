@@ -1,5 +1,6 @@
 import * as CANNON from "cannon-es";
 import { CONFIG } from "./config";
+import type { BallProfile } from "./balls";
 import type { Ball } from "./objects/Ball";
 import type { ElementalBuildup } from "./elemental/ElementalBuildup";
 
@@ -7,6 +8,7 @@ export class Controls {
   private keys = new Set<string>();
   private enabled = true;
   speedMultiplier = 1;
+  ballProfile?: BallProfile;
   elementalBuildup: ElementalBuildup | null = null;
 
   // Virtual joystick state
@@ -161,7 +163,7 @@ export class Controls {
     if (!this.enabled) return;
 
     const force = new CANNON.Vec3(0, 0, 0);
-    const { moveForce } = CONFIG.ball;
+    const moveForce = this.ballProfile?.moveForce ?? CONFIG.ball.moveForce;
 
     const sinA = Math.sin(cameraAngle);
     const cosA = Math.cos(cameraAngle);
@@ -203,8 +205,20 @@ export class Controls {
     }
 
     if (force.length() > 0) {
+      const horizontalSpeed = Math.hypot(ball.body.velocity.x, ball.body.velocity.z);
+      if (this.ballProfile && horizontalSpeed > 0.5) {
+        const velocityDirection = new CANNON.Vec3(
+          ball.body.velocity.x / horizontalSpeed,
+          0,
+          ball.body.velocity.z / horizontalSpeed,
+        );
+        const parallelMagnitude = force.dot(velocityDirection);
+        const parallel = velocityDirection.scale(parallelMagnitude);
+        const lateral = force.vsub(parallel).scale(this.ballProfile.steeringMultiplier);
+        parallel.vadd(lateral, force);
+      }
       const speed = ball.speed;
-      const maxSpeed = CONFIG.ball.maxSpeed * this.speedMultiplier;
+      const maxSpeed = (this.ballProfile?.maxSpeed ?? CONFIG.ball.maxSpeed) * this.speedMultiplier;
       const speedRatio = Math.max(0, 1 - speed / maxSpeed);
       force.scale(speedRatio * this.speedMultiplier, force);
       this.elementalBuildup?.modifyForce(force);

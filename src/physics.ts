@@ -8,6 +8,7 @@ export class Physics {
   wallMaterial: CANNON.Material;
   iceMaterial: CANNON.Material;
   bounceMaterial: CANNON.Material;
+  private ballContacts: Array<{ contact: CANNON.ContactMaterial; baseFriction: number; baseRestitution: number }> = [];
 
   constructor() {
     this.world = new CANNON.World({
@@ -23,33 +24,42 @@ export class Physics {
     this.iceMaterial = new CANNON.Material("ice");
     this.bounceMaterial = new CANNON.Material("bounce");
 
-    this.world.addContactMaterial(
-      new CANNON.ContactMaterial(this.ballMaterial, this.groundMaterial, {
+    const groundContact = new CANNON.ContactMaterial(this.ballMaterial, this.groundMaterial, {
         friction: CONFIG.physics.groundFriction,
         restitution: CONFIG.physics.groundRestitution,
-      }),
-    );
+      });
+    this.world.addContactMaterial(groundContact);
 
-    this.world.addContactMaterial(
-      new CANNON.ContactMaterial(this.ballMaterial, this.wallMaterial, {
+    const wallContact = new CANNON.ContactMaterial(this.ballMaterial, this.wallMaterial, {
         friction: CONFIG.physics.wallFriction,
         restitution: CONFIG.physics.wallRestitution,
-      }),
-    );
+      });
+    this.world.addContactMaterial(wallContact);
 
-    this.world.addContactMaterial(
-      new CANNON.ContactMaterial(this.ballMaterial, this.iceMaterial, {
+    const iceContact = new CANNON.ContactMaterial(this.ballMaterial, this.iceMaterial, {
         friction: CONFIG.physics.iceFriction,
         restitution: CONFIG.physics.iceRestitution,
-      }),
-    );
+      });
+    this.world.addContactMaterial(iceContact);
 
-    this.world.addContactMaterial(
-      new CANNON.ContactMaterial(this.ballMaterial, this.bounceMaterial, {
+    const bounceContact = new CANNON.ContactMaterial(this.ballMaterial, this.bounceMaterial, {
         friction: CONFIG.physics.bounceFriction,
         restitution: CONFIG.physics.bounceRestitution,
-      }),
-    );
+      });
+    this.world.addContactMaterial(bounceContact);
+    this.ballContacts = [
+      { contact: groundContact, baseFriction: CONFIG.physics.groundFriction, baseRestitution: CONFIG.physics.groundRestitution },
+      { contact: wallContact, baseFriction: CONFIG.physics.wallFriction, baseRestitution: CONFIG.physics.wallRestitution },
+      { contact: iceContact, baseFriction: CONFIG.physics.iceFriction, baseRestitution: CONFIG.physics.iceRestitution },
+      { contact: bounceContact, baseFriction: CONFIG.physics.bounceFriction, baseRestitution: CONFIG.physics.bounceRestitution },
+    ];
+  }
+
+  setBallHandling(gripMultiplier: number, restitutionMultiplier: number) {
+    for (const { contact, baseFriction, baseRestitution } of this.ballContacts) {
+      contact.friction = Math.min(1, baseFriction * gripMultiplier);
+      contact.restitution = Math.min(1.35, baseRestitution * restitutionMultiplier);
+    }
   }
 
   step(dt: number) {

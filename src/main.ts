@@ -18,6 +18,7 @@ import { hasMidnightWallet, connectMidnightWallet, watchWalletSync, getMidnightW
 import { MomentumEffects } from "./effects/MomentumEffects";
 import { ContactEffects } from "./effects/ContactEffects";
 import { SurfaceType } from "./objects/Path";
+import { BALL_PROFILES, DEFAULT_BALL_ID, ballVersionKey, isBallId, type BallId } from "./balls";
 
 type GameState = "menu" | "playing" | "finishing" | "levelComplete" | "allComplete";
 
@@ -51,6 +52,7 @@ class Game {
   private runGeneration = 0;
   private currentBestMs: number | null = null;
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  private selectedBall: BallId = DEFAULT_BALL_ID;
 
   constructor() {
     const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -61,6 +63,9 @@ class Game {
     this.camera = new GameCamera(this.renderer.camera);
     this.levelManager = new LevelManager(this.renderer.scene, this.physics);
     this.hud = new HUD();
+    const savedBall = localStorage.getItem("heavy-ball-selected-ball");
+    this.selectedBall = isBallId(savedBall) ? savedBall : DEFAULT_BALL_ID;
+    this.applyBallProfile(this.selectedBall);
     this.debug = new DebugRenderer(this.renderer.scene, this.physics);
     this.powerUpManager = new PowerUpManager();
     this.elementalBuildup = new ElementalBuildup();
@@ -174,6 +179,7 @@ class Game {
   }
 
   private setupHUDCallbacks() {
+    this.hud.onBallSelect = (id) => this.applyBallProfile(id);
     this.hud.onWalletConnect = async () => {
       this.hud.showWalletConnecting();
       try {
@@ -250,6 +256,15 @@ class Game {
     this.onLevelStart();
   }
 
+  private applyBallProfile(id: BallId) {
+    this.selectedBall = id;
+    const profile = BALL_PROFILES[id];
+    this.ball.setProfile(id);
+    this.controls.ballProfile = profile;
+    this.hud.setSelectedBall(id);
+    localStorage.setItem("heavy-ball-selected-ball", id);
+  }
+
   private onLevelStart() {
     this.renderer.selectRandomBackground();
     this.state = "playing";
@@ -270,7 +285,7 @@ class Game {
     this.hud.clearPowerUps();
     this.hud.updateElementalBuildup(0, 0);
     this.hud.setLevel(this.levelManager.currentLevelName, this.levelManager.currentLevelNumber - 1);
-    const bestKey = `heavy-ball-best-${this.levelManager.currentLevelNumber}`;
+    const bestKey = `heavy-ball-best-${this.levelManager.currentLevelNumber}-${ballVersionKey(BALL_PROFILES[this.selectedBall])}`;
     const storedBest = Number.parseInt(localStorage.getItem(bestKey) ?? "", 10);
     this.currentBestMs = Number.isFinite(storedBest) ? storedBest : null;
     this.hud.setBestTime(this.currentBestMs);
@@ -292,7 +307,8 @@ class Game {
 
     // Request a server session token for this level attempt
     if (this.player && this.player.id > 0) {
-      api.startSession(this.player.id, this.levelManager.currentLevelNumber).then((res) => {
+      const profile = BALL_PROFILES[this.selectedBall];
+      api.startSession(this.player.id, this.levelManager.currentLevelNumber, profile.id, profile.version).then((res) => {
         this.sessionToken = res.session_token;
       }).catch(() => {
         this.sessionToken = "";
@@ -326,6 +342,8 @@ class Game {
         speed_boosts: this.speedBoosts,
         fire_maxed: this.elementalBuildup.fireMaxed,
         ice_maxed: this.elementalBuildup.iceMaxed,
+        ball_id: this.selectedBall,
+        physics_version: BALL_PROFILES[this.selectedBall].version,
       }, this.sessionToken);
       if (result.achievements_unlocked.length > 0) {
         this.hud.showAchievementUnlocked(result.achievements_unlocked, result.achievements_display);
@@ -362,7 +380,7 @@ class Game {
 
       const vel = this.ball.body.velocity;
       const speed = vel.length();
-      const maxSpeed = CONFIG.ball.maxSpeed * this.controls.speedMultiplier;
+      const maxSpeed = BALL_PROFILES[this.selectedBall].maxSpeed * this.controls.speedMultiplier;
       if (speed > maxSpeed) {
         vel.scale(maxSpeed / speed, vel);
       }
@@ -384,17 +402,7 @@ class Game {
           playFreeze();
         }
 
-        // Ball tint
-        const ballMat = this.ball.mesh.material as THREE.MeshStandardMaterial;
-        if (this.elementalBuildup.fire > 0.01) {
-          const t = this.elementalBuildup.fire;
-          ballMat.emissive.setRGB(t * 1.0, t * 0.3, 0);
-        } else if (this.elementalBuildup.ice > 0.01) {
-          const t = this.elementalBuildup.ice;
-          ballMat.emissive.setRGB(0, t * 0.4, t * 1.0);
-        } else {
-          ballMat.emissive.setRGB(0, 0, 0);
-        }
+        this.ball.setElementalTint(this.elementalBuildup.fire, this.elementalBuildup.ice);
 
         // Elemental ambient sounds
         this.elementalSoundTimer -= dt;
@@ -529,7 +537,7 @@ class Game {
         const levelNum = this.levelManager.currentLevelNumber;
         const isPersonalBest = this.currentBestMs === null || timeMs < this.currentBestMs;
         if (isPersonalBest) {
-          localStorage.setItem(`heavy-ball-best-${levelNum}`, String(Math.round(timeMs)));
+          localStorage.setItem(`heavy-ball-best-${levelNum}-${ballVersionKey(BALL_PROFILES[this.selectedBall])}`, String(Math.round(timeMs)));
           this.currentBestMs = timeMs;
         }
 

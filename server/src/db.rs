@@ -6,6 +6,28 @@ pub struct Db {
     pub conn: Mutex<Connection>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::Db;
+
+    #[test]
+    fn scores_and_sessions_are_partitioned_by_ball_version() {
+        let db = Db::new(":memory:").unwrap();
+        let address = format!("mn_shield-addr_{}", "a".repeat(48));
+        let (player_id, _, _, _) = db.upsert_wallet(&address, "preview").unwrap();
+
+        let core_id = db.upsert_score(player_id, 1, 12_000, 0, 0, 0, 0, false, false, "core", 1).unwrap();
+        let magma_id = db.upsert_score(player_id, 1, 15_000, 0, 0, 0, 0, false, false, "magma", 1).unwrap();
+        assert_ne!(core_id, magma_id);
+        assert_eq!(db.top_scores(1, "core", 1, 20, "preview").unwrap()[0].2, 12_000);
+        assert_eq!(db.top_scores(1, "magma", 1, 20, "preview").unwrap()[0].2, 15_000);
+
+        let session = db.create_session(player_id, 1, "magma", 1).unwrap();
+        assert!(!db.consume_session(&session, player_id, 1, "core", 1).unwrap());
+        assert!(db.consume_session(&session, player_id, 1, "magma", 1).unwrap());
+    }
+}
+
 impl Db {
     pub fn new(path: &str) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -96,6 +118,17 @@ impl Db {
             )?;
         }
 
+        let has_ball_id: bool = conn.prepare("SELECT ball_id FROM scores LIMIT 0").is_ok();
+        if !has_ball_id {
+            conn.execute_batch(
+                "ALTER TABLE scores ADD COLUMN ball_id TEXT NOT NULL DEFAULT 'core';
+                 ALTER TABLE scores ADD COLUMN physics_version INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE sessions ADD COLUMN ball_id TEXT NOT NULL DEFAULT 'core';
+                 ALTER TABLE sessions ADD COLUMN physics_version INTEGER NOT NULL DEFAULT 1;
+                 CREATE INDEX IF NOT EXISTS idx_scores_ball_level ON scores(ball_id, physics_version, level, time_ms ASC);",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -158,13 +191,14 @@ impl Db {
         boxes_broken: i64, power_ups_collected: i64,
         fall_count: i64, speed_boosts: i64,
         fire_maxed: bool, ice_maxed: bool,
+        ball_id: &str, physics_version: i64,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let fire_i = fire_maxed as i64;
         let ice_i = ice_maxed as i64;
         let existing: Option<(i64, i64)> = conn.prepare(
-            "SELECT id, time_ms FROM scores WHERE player_id = ?1 AND level = ?2",
-        )?.query_row(params![player_id, level], |row| {
+            "SELECT id, time_ms FROM scores WHERE player_id = ?1 AND level = ?2 AND ball_id = ?3 AND physics_version = ?4",
+        )?.query_row(params![player_id, level, ball_id, physics_version], |row| {
             Ok((row.get(0)?, row.get(1)?))
         }).ok();
 
@@ -186,8 +220,8 @@ impl Db {
             }
             None => {
                 conn.execute(
-                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_maxed, ice_maxed) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-                    params![player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_i, ice_i],
+                    "INSERT INTO scores (player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_maxed, ice_maxed, ball_id, physics_version) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                    params![player_id, level, time_ms, boxes_broken, power_ups_collected, fall_count, speed_boosts, fire_i, ice_i, ball_id, physics_version],
                 )?;
                 Ok(conn.last_insert_rowid())
             }
@@ -214,17 +248,17 @@ impl Db {
         )
     }
 
-    pub fn top_scores(&self, level: i64, limit: i64, network_id: &str) -> Result<Vec<(String, Option<String>, i64, i64)>> {
+    pub fn top_scores(&self, level: i64, ball_id: &str, physics_version: i64, limit: i64, network_id: &str) -> Result<Vec<(String, Option<String>, i64, i64)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT COALESCE(p.wallet_address, p.alias), p.wallet_address, MIN(s.time_ms) as best_time, s.player_id
              FROM scores s JOIN players p ON s.player_id = p.id
-             WHERE s.level = ?1 AND p.network_id = ?3
+             WHERE s.level = ?1 AND s.ball_id = ?2 AND s.physics_version = ?3 AND p.network_id = ?5
              GROUP BY s.player_id
              ORDER BY best_time ASC
-             LIMIT ?2",
+             LIMIT ?4",
         )?;
-        let rows = stmt.query_map(params![level, limit, network_id], |row| {
+        let rows = stmt.query_map(params![level, ball_id, physics_version, limit, network_id], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?.collect::<Result<Vec<_>>>()?;
         Ok(rows)
@@ -314,22 +348,22 @@ impl Db {
     }
 
     /// Create a new session row and return the session ID.
-    pub fn create_session(&self, player_id: i64, level: i64) -> Result<String> {
+    pub fn create_session(&self, player_id: i64, level: i64, ball_id: &str, physics_version: i64) -> Result<String> {
         let conn = self.conn.lock().unwrap();
         let id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO sessions (id, player_id, level) VALUES (?1, ?2, ?3)",
-            params![id, player_id, level],
+            "INSERT INTO sessions (id, player_id, level, ball_id, physics_version) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, player_id, level, ball_id, physics_version],
         )?;
         Ok(id)
     }
 
     /// Mark a session as used. Returns true if it was valid and unused, false otherwise.
-    pub fn consume_session(&self, session_id: &str, player_id: i64, level: i64) -> Result<bool> {
+    pub fn consume_session(&self, session_id: &str, player_id: i64, level: i64, ball_id: &str, physics_version: i64) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
-            "UPDATE sessions SET used = 1 WHERE id = ?1 AND player_id = ?2 AND level = ?3 AND used = 0",
-            params![session_id, player_id, level],
+            "UPDATE sessions SET used = 1 WHERE id = ?1 AND player_id = ?2 AND level = ?3 AND ball_id = ?4 AND physics_version = ?5 AND used = 0",
+            params![session_id, player_id, level, ball_id, physics_version],
         )?;
         Ok(updated > 0)
     }
