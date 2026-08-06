@@ -73,6 +73,7 @@ export class Obstacle {
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
     if (def.rotation) this.mesh.rotation.y = def.rotation;
+    this.addOpaqueCore(w, h, d, baseColor, !!def.powerUp);
     this.addVisualDetails(w, h, d, baseColor, !!def.powerUp);
     scene.add(this.mesh);
 
@@ -123,13 +124,35 @@ export class Obstacle {
     }
   }
 
+  private addOpaqueCore(w: number, h: number, d: number, color: number, isPowerUp: boolean) {
+    // The rounded shell can be viewed through translucent course geometry and
+    // post-processing in an order that makes the scenery appear inside it.
+    // A slightly inset, depth-writing core guarantees that boxes remain solid.
+    const core = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.94, h * 0.94, d * 0.94),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).multiplyScalar(isPowerUp ? 0.72 : 0.62),
+        emissive: isPowerUp ? color : 0x000000,
+        emissiveIntensity: isPowerUp ? 0.12 : 0,
+        roughness: 0.68,
+        metalness: 0.12,
+        transparent: false,
+        opacity: 1,
+        depthWrite: true,
+      }),
+    );
+    core.castShadow = true;
+    core.receiveShadow = true;
+    this.mesh.add(core);
+  }
+
   private addVisualDetails(w: number, h: number, d: number, color: number, isPowerUp: boolean) {
     const panel = createRoundedPanel(
       Math.max(0.2, w * 0.72),
       Math.max(0.2, d * 0.72),
       new THREE.Color(color).lerp(new THREE.Color(0xffffff), isPowerUp ? 0.24 : 0.12).getHex(),
       isPowerUp ? color : 0x000000,
-      isPowerUp ? 0.78 : 0.55,
+      1,
     );
     panel.position.y = h / 2 + 0.018;
     this.mesh.add(panel);
