@@ -324,7 +324,13 @@ export function getIceSurfaceTexture(): THREE.CanvasTexture {
       ctx.stroke();
     }
   });
-  sharedIceSurface.repeat.set(1.4, 1.4);
+  // Ice should read as one poured/frozen sheet. Repeating this square texture
+  // exposed its edges and made long surfaces look like rows of ceramic tiles.
+  // Clamp one crystalline field across each authored surface instead.
+  sharedIceSurface.wrapS = THREE.ClampToEdgeWrapping;
+  sharedIceSurface.wrapT = THREE.ClampToEdgeWrapping;
+  sharedIceSurface.repeat.set(1, 1);
+  sharedIceSurface.needsUpdate = true;
   return sharedIceSurface;
 }
 
